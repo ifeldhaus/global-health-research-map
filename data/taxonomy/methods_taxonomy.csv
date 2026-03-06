@@ -1,0 +1,14 @@
+method_id,method_name,method_description
+M01,Randomized Controlled Trial,Prospective randomized assignment to intervention or control
+M02,Quasi-Experimental,Causal inference methods: difference-in-differences, instrumental variables, regression discontinuity, interrupted time series
+M03,Cohort / Longitudinal Study,Prospective or retrospective follow-up of a defined population over time
+M04,Cross-Sectional Survey,Single time-point data collection from a defined population sample
+M05,Systematic Review / Meta-Analysis,Structured synthesis of existing literature with or without pooled quantitative analysis
+M06,Qualitative / Mixed Methods,In-depth interviews, focus groups, ethnography, or combination with quantitative methods
+M07,Modeling / Simulation,Mathematical, statistical, or computational models projecting outcomes or disease dynamics
+M08,Economic Evaluation,Cost-effectiveness, cost-benefit, cost-utility, or budget impact analysis
+M09,Implementation Science,Frameworks and methods for studying real-world uptake and scale-up of interventions
+M10,Geospatial / Remote Sensing,Geographic information systems, satellite data, or spatial statistical methods
+M11,Machine Learning / AI,Supervised, unsupervised, or deep learning methods applied to health data
+M12,Secondary Data Analysis,Analysis of existing datasets not collected by the study authors (e.g. DHS, HMIS, claims data)
+M13,Other / Unclear,Method does not fit above categories or cannot be determined from abstract

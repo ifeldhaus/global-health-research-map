@@ -1,0 +1,144 @@
+category_letter,category_name,subtopic_id,subtopic_name
+A,Maternal & Reproductive Health,A01,Antenatal care & pregnancy outcomes
+A,Maternal & Reproductive Health,A02,Intrapartum & skilled birth attendance
+A,Maternal & Reproductive Health,A03,Postnatal & postpartum care
+A,Maternal & Reproductive Health,A04,Maternal nutrition (iron, folate, iodine, micronutrients)
+A,Maternal & Reproductive Health,A05,Maternal mental health (perinatal depression, anxiety)
+A,Maternal & Reproductive Health,A06,Family planning & contraception
+A,Maternal & Reproductive Health,A07,Infertility & assisted reproduction
+A,Maternal & Reproductive Health,A08,Abortion & unsafe abortion
+A,Maternal & Reproductive Health,A09,Obstetric fistula & maternal morbidity
+A,Maternal & Reproductive Health,A10,Maternal mortality & near-miss analysis
+B,Child & Adolescent Health,B01,Neonatal health & survival
+B,Child & Adolescent Health,B02,Child growth, stunting & wasting
+B,Child & Adolescent Health,B03,Child nutrition & micronutrient deficiency
+B,Child & Adolescent Health,B04,Breastfeeding & complementary feeding
+B,Child & Adolescent Health,B05,Immunization & vaccine coverage
+B,Child & Adolescent Health,B06,Diarrheal disease in children
+B,Child & Adolescent Health,B07,Acute respiratory infections in children
+B,Child & Adolescent Health,B08,Child development & early childhood interventions
+B,Child & Adolescent Health,B09,Adolescent sexual & reproductive health
+B,Child & Adolescent Health,B10,Adolescent mental health
+B,Child & Adolescent Health,B11,Child protection, abuse & violence
+C,Infectious Disease (non-NTD non-HIV/TB/Malaria),C01,Respiratory infections (pneumonia, influenza, COVID-19)
+C,Infectious Disease (non-NTD non-HIV/TB/Malaria),C02,Diarrheal diseases (cholera, typhoid, rotavirus)
+C,Infectious Disease (non-NTD non-HIV/TB/Malaria),C03,Vaccine-preventable diseases (measles, polio, meningitis)
+C,Infectious Disease (non-NTD non-HIV/TB/Malaria),C04,Arboviral diseases (dengue, Zika, chikungunya)
+C,Infectious Disease (non-NTD non-HIV/TB/Malaria),C05,Hepatitis B, C & E
+C,Infectious Disease (non-NTD non-HIV/TB/Malaria),C06,Foodborne & waterborne illness
+C,Infectious Disease (non-NTD non-HIV/TB/Malaria),C07,Antimicrobial resistance (AMR)
+C,Infectious Disease (non-NTD non-HIV/TB/Malaria),C08,Emerging infectious diseases & outbreak response
+C,Infectious Disease (non-NTD non-HIV/TB/Malaria),C09,Infection prevention & control (IPC)
+D,HIV / AIDS / TB / Malaria,D01,HIV prevention (PrEP, condoms, PMTCT)
+D,HIV / AIDS / TB / Malaria,D02,HIV treatment & care (ART, adherence)
+D,HIV / AIDS / TB / Malaria,D03,HIV & co-morbidities (TB-HIV, mental health)
+D,HIV / AIDS / TB / Malaria,D04,Tuberculosis - drug-sensitive
+D,HIV / AIDS / TB / Malaria,D05,Tuberculosis - drug-resistant (MDR/XDR-TB)
+D,HIV / AIDS / TB / Malaria,D06,TB diagnostics & case detection
+D,HIV / AIDS / TB / Malaria,D07,Malaria prevention (bed nets, IRS, SMC)
+D,HIV / AIDS / TB / Malaria,D08,Malaria treatment & case management
+D,HIV / AIDS / TB / Malaria,D09,Malaria elimination & eradication strategies
+D,HIV / AIDS / TB / Malaria,D10,Multi-disease integration & co-infection
+E,Neglected Tropical Diseases,E01,Soil-transmitted helminths
+E,Neglected Tropical Diseases,E02,Schistosomiasis
+E,Neglected Tropical Diseases,E03,Lymphatic filariasis
+E,Neglected Tropical Diseases,E04,Onchocerciasis (river blindness)
+E,Neglected Tropical Diseases,E05,Trachoma
+E,Neglected Tropical Diseases,E06,Leishmaniasis
+E,Neglected Tropical Diseases,E07,Human African trypanosomiasis
+E,Neglected Tropical Diseases,E08,Leprosy
+E,Neglected Tropical Diseases,E09,Rabies & snakebite
+E,Neglected Tropical Diseases,E10,Mass drug administration programs
+E,Neglected Tropical Diseases,E11,NTD elimination strategies & drug access
+F,Non-Communicable Diseases (NCDs),F01,Cardiovascular disease (hypertension, stroke, IHD)
+F,Non-Communicable Diseases (NCDs),F02,Diabetes & metabolic disorders
+F,Non-Communicable Diseases (NCDs),F03,Cancer (screening, treatment, palliative)
+F,Non-Communicable Diseases (NCDs),F04,Chronic respiratory disease (COPD, asthma)
+F,Non-Communicable Diseases (NCDs),F05,Obesity & overweight
+F,Non-Communicable Diseases (NCDs),F06,Chronic kidney & liver disease
+F,Non-Communicable Diseases (NCDs),F07,Neurological disorders (epilepsy, dementia)
+F,Non-Communicable Diseases (NCDs),F08,Musculoskeletal disorders
+F,Non-Communicable Diseases (NCDs),F09,NCD risk factors (tobacco, alcohol, inactivity, diet)
+F,Non-Communicable Diseases (NCDs),F10,NCD health systems, policy & prevention
+G,Mental Health & Substance Use,G01,Depression & anxiety disorders
+G,Mental Health & Substance Use,G02,Psychosis & severe mental illness
+G,Mental Health & Substance Use,G03,Post-traumatic stress disorder (PTSD)
+G,Mental Health & Substance Use,G04,Suicide & self-harm
+G,Mental Health & Substance Use,G05,Alcohol use disorders
+G,Mental Health & Substance Use,G06,Drug use disorders & harm reduction
+G,Mental Health & Substance Use,G07,Mental health in humanitarian & conflict settings
+G,Mental Health & Substance Use,G08,Perinatal & child/adolescent mental health
+G,Mental Health & Substance Use,G09,Mental health systems, task-sharing & mhGAP
+G,Mental Health & Substance Use,G10,Stigma, discrimination & mental health
+H,Nutrition & Micronutrient Deficiency,H01,Iron deficiency anaemia
+H,Nutrition & Micronutrient Deficiency,H02,Vitamin A deficiency
+H,Nutrition & Micronutrient Deficiency,H03,Iodine deficiency & thyroid disorders
+H,Nutrition & Micronutrient Deficiency,H04,Zinc deficiency
+H,Nutrition & Micronutrient Deficiency,H05,Vitamin D deficiency
+H,Nutrition & Micronutrient Deficiency,H06,Folate & B12 deficiency
+H,Nutrition & Micronutrient Deficiency,H07,Food fortification programs & delivery systems
+H,Nutrition & Micronutrient Deficiency,H08,Dietary diversity, food environments & food systems
+H,Nutrition & Micronutrient Deficiency,H09,Acute malnutrition (SAM & MAM)
+H,Nutrition & Micronutrient Deficiency,H10,Double burden of malnutrition
+H,Nutrition & Micronutrient Deficiency,H11,Nutritional biomarkers & epidemiology methods
+I,Health Systems & Universal Health Coverage,I01,Health financing & insurance coverage
+I,Health Systems & Universal Health Coverage,I02,Human resources for health (workforce, training, retention)
+I,Health Systems & Universal Health Coverage,I03,Primary health care & community health workers
+I,Health Systems & Universal Health Coverage,I04,Medicines access, supply chains & stockouts
+I,Health Systems & Universal Health Coverage,I05,Health information systems & data quality
+I,Health Systems & Universal Health Coverage,I06,Governance, accountability & anti-corruption
+I,Health Systems & Universal Health Coverage,I07,Service delivery models, integration & task-shifting
+I,Health Systems & Universal Health Coverage,I08,Quality of care & patient safety
+I,Health Systems & Universal Health Coverage,I09,UHC measurement & progress tracking
+I,Health Systems & Universal Health Coverage,I10,Private sector engagement & mixed health systems
+J,Health Economics & Financing,J01,Out-of-pocket expenditure & catastrophic health spending
+J,Health Economics & Financing,J02,Social & community-based health insurance
+J,Health Economics & Financing,J03,Cost-effectiveness & cost-benefit analysis
+J,Health Economics & Financing,J04,Health technology assessment (HTA)
+J,Health Economics & Financing,J05,Development assistance for health (DAH) flows
+J,Health Economics & Financing,J06,Domestic resource mobilization for health
+J,Health Economics & Financing,J07,Economic burden & productivity loss of disease
+J,Health Economics & Financing,J08,Health labor markets & remuneration
+K,Climate Environment & Health,K01,Air pollution & respiratory/cardiovascular health
+K,Climate Environment & Health,K02,Water, sanitation & hygiene (WASH)
+K,Climate Environment & Health,K03,Climate change & vector-borne disease distribution
+K,Climate Environment & Health,K04,Extreme weather events & health outcomes
+K,Climate Environment & Health,K05,Environmental toxins, heavy metals & chemical exposure
+K,Climate Environment & Health,K06,Occupational health & safety
+K,Climate Environment & Health,K07,Food systems, agriculture & nutritional security
+K,Climate Environment & Health,K08,One Health (human-animal-environment interface)
+K,Climate Environment & Health,K09,Planetary health frameworks & policy
+L,Conflict Humanitarian & Displacement,L01,Refugee & IDP health
+L,Conflict Humanitarian & Displacement,L02,Conflict-related mortality, injury & violence
+L,Conflict Humanitarian & Displacement,L03,Mental health in conflict & displacement settings
+L,Conflict Humanitarian & Displacement,L04,Sexual & gender-based violence in conflict
+L,Conflict Humanitarian & Displacement,L05,Health system disruption & resilience in crises
+L,Conflict Humanitarian & Displacement,L06,Humanitarian response coordination & standards
+L,Conflict Humanitarian & Displacement,L07,Forced migration & infectious disease transmission
+L,Conflict Humanitarian & Displacement,L08,Food insecurity in humanitarian settings
+M,Surgical Trauma & Emergency Care,M01,Essential surgery & anaesthesia access
+M,Surgical Trauma & Emergency Care,M02,Trauma & injury epidemiology
+M,Surgical Trauma & Emergency Care,M03,Road traffic injuries & prevention
+M,Surgical Trauma & Emergency Care,M04,Burns
+M,Surgical Trauma & Emergency Care,M05,Emergency obstetric & neonatal care
+M,Surgical Trauma & Emergency Care,M06,Perioperative care in LMICs
+M,Surgical Trauma & Emergency Care,M07,Surgical workforce & capacity building
+M,Surgical Trauma & Emergency Care,M08,Emergency care systems & pre-hospital care
+N,Epidemiology & Burden of Disease,N01,Mortality estimation & vital registration
+N,Epidemiology & Burden of Disease,N02,Cause-of-death attribution & verbal autopsy
+N,Epidemiology & Burden of Disease,N03,Disease burden modeling (GBD methodology)
+N,Epidemiology & Burden of Disease,N04,Epidemiological surveillance & outbreak detection
+N,Epidemiology & Burden of Disease,N05,Cancer registries & NCD surveillance systems
+N,Epidemiology & Burden of Disease,N06,Demographic & health surveys (DHS, MICS)
+N,Epidemiology & Burden of Disease,N07,Small-area estimation & geospatial burden mapping
+N,Epidemiology & Burden of Disease,N08,Risk factor epidemiology & PAF estimation
+O,Research Methods & Capacity Building,O01,Randomized trial design & implementation
+O,Research Methods & Capacity Building,O02,Adaptive, cluster & platform trial designs
+O,Research Methods & Capacity Building,O03,Quasi-experimental & causal inference methods
+O,Research Methods & Capacity Building,O04,Implementation science frameworks (e.g. CFIR, RE-AIM)
+O,Research Methods & Capacity Building,O05,Qualitative & mixed-methods approaches
+O,Research Methods & Capacity Building,O06,Health research capacity strengthening in LMICs
+O,Research Methods & Capacity Building,O07,Research ethics, consent & community engagement
+O,Research Methods & Capacity Building,O08,Open data, reproducibility & data sharing
+O,Research Methods & Capacity Building,O09,Systematic review & evidence synthesis methodology
+O,Research Methods & Capacity Building,O10,AI & machine learning applications in global health
