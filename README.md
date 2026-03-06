@@ -4,7 +4,7 @@
 
 A computational analysis of ~100,000 papers published in core global health journals from 2010–2024, examining funder concentration, geographic equity, topic trends, and methodological gaps.
 
-**Isabelle Feldhaus — Belle Labs / Femme Fortified — 2026**
+**Isabelle Feldhaus — 2026**
 
 📊 [Dashboard](#) · 📄 [Report](#) · 🗂 [Preprint](#)
 
