@@ -11,4 +11,9 @@ M09,Implementation Science,Frameworks and methods for studying real-world uptake
 M10,Geospatial / Remote Sensing,Geographic information systems, satellite data, or spatial statistical methods
 M11,Machine Learning / AI,Supervised, unsupervised, or deep learning methods applied to health data
 M12,Secondary Data Analysis,Analysis of existing datasets not collected by the study authors (e.g. DHS, HMIS, claims data)
-M13,Other / Unclear,Method does not fit above categories or cannot be determined from abstract
+M13,Scoping Review,"Systematic mapping of evidence on a broad topic following a defined protocol (e.g. PRISMA-ScR), without formal quality appraisal"
+M14,Narrative Review,"Non-systematic literature review, overview of reviews, or narrative synthesis without a formal search protocol or defined methodology"
+M15,Commentary / Editorial / Perspective,"Non-empirical opinion piece, editorial, viewpoint, policy brief, guidance document, or theoretical framework"
+M16,Descriptive Epidemiology / Ecological Study,"Population-level burden estimates, prevalence or incidence calculations, trend analyses, ecological comparisons, or pooled descriptive analyses"
+M17,Case Study / Case Report,Description and analysis of individual cases or small case series
+M18,Other / Unclear,Method does not fit above categories or cannot be determined from abstract
