@@ -32,8 +32,9 @@ con.execute("""
         topic_confidence  VARCHAR,
         method_type       VARCHAR,
         method_confidence VARCHAR,
-        study_country     VARCHAR,
-        gender_first      VARCHAR,
+        study_country      VARCHAR,
+        country_confidence VARCHAR,
+        gender_first       VARCHAR,
         gender_last       VARCHAR,
 
         -- completion flags for resumability
