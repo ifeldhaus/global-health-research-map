@@ -41,7 +41,7 @@ PER_PAGE     = 200    # max per API page
 
 def seed_funders(con: duckdb.DuckDBPyConnection):
     """Load canonical funders from CSV into the funders table."""
-    with open(FUNDER_CSV, encoding='utf-8', errors='replace') as f:
+    with open(FUNDER_CSV, encoding='utf-8-sig') as f:
         rows = list(csv.DictReader(f))
 
     con.execute("DELETE FROM funders")  # refresh each run
