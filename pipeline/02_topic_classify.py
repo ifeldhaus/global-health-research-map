@@ -35,7 +35,7 @@ load_dotenv(override=True)
 DB           = 'data/global_health.duckdb'
 TAXONOMY_CSV = 'data/taxonomy/topic_taxonomy.csv'
 MODEL        = 'claude-haiku-4-5'
-CHUNK_SIZE   = 50   # concurrent requests; saturates Haiku rate limit safely
+CHUNK_SIZE   = 10   # concurrent requests; conservative to avoid rate limits
 MAX_TOKENS   = 20   # label only: "A|A04|high" is ~12 chars
 MOCK         = False # set via --mock flag; bypasses API calls
 
@@ -194,10 +194,41 @@ def load_unclassified(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str]]:
 
 
 def parse_label(raw: str) -> tuple[str, str, str]:
-    """Parse 'A|A04|high' → (category, subtopic, confidence)."""
-    parts = [p.strip() for p in raw.split('|')]
-    if len(parts) == 3:
-        return parts[0], parts[1], parts[2]
+    """Parse 'A|A04|high' → (category, subtopic, confidence).
+
+    Handles common model response variants:
+    - 'A|A04|high'           → standard 3-part format
+    - 'A04|A04|high'         → subtopic echoed as category (extract letter)
+    - 'A|A04|high\\n...'     → extra text after label (take first line)
+    - 'A04|high'             → missing category letter (infer from subtopic)
+    - 'A|high'               → missing subtopic (category + confidence only)
+    """
+    # Take only the first line — model sometimes appends explanation
+    first_line = raw.split('\n')[0].strip()
+    parts = [p.strip() for p in first_line.split('|')]
+
+    valid_conf = {'high', 'med', 'low'}
+
+    if len(parts) >= 3:
+        cat, sub, conf = parts[0], parts[1], parts[2]
+        if conf not in valid_conf:
+            conf = 'low'
+        # Standard: 'A|A04|high'
+        if len(cat) == 1 and cat.isalpha() and cat.isupper():
+            return cat, sub, conf
+        # Model echoed subtopic as category: 'A04|A04|high'
+        if len(cat) >= 2 and cat[0].isalpha() and cat[0].isupper():
+            return cat[0], sub, conf
+
+    if len(parts) == 2:
+        a, b = parts[0], parts[1]
+        # Case: 'A04|high' — subtopic + confidence, missing category letter
+        if len(a) >= 2 and a[0].isalpha() and a[0].isupper() and b in valid_conf:
+            return a[0], a, b
+        # Case: 'A|high' — category + confidence, missing subtopic
+        if len(a) == 1 and a.isalpha() and a.isupper() and b in valid_conf:
+            return a, f'{a}00', b
+
     # Malformed response — mark as unclassified
     return 'Z', 'Z00', 'low'
 

@@ -41,7 +41,7 @@ PER_PAGE    = 200
 
 FIELDS = (
     'id,title,abstract_inverted_index,'
-    'authorships,grants,publication_year,cited_by_count,'
+    'authorships,funders,publication_year,cited_by_count,'
     'primary_location'
 )
 
@@ -184,12 +184,12 @@ def parse_work(work: dict, issn: str) -> dict:
             'institution_country': inst.get('country_code', ''),
         })
 
-    grants = []
-    for g in work.get('grants', []):
-        grants.append({
-            'funder_id':   g.get('funder', ''),
-            'funder_name': g.get('funder_display_name', ''),
-            'award_id':    g.get('award_id', ''),
+    funders = []
+    for f in work.get('funders', []):
+        funders.append({
+            'funder_id':   f.get('id', ''),
+            'funder_name': f.get('display_name', ''),
+            'award_id':    '',  # award detail lives in 'awards' field; not needed here
         })
 
     return {
@@ -200,7 +200,7 @@ def parse_work(work: dict, issn: str) -> dict:
         'journal_issn':    issn,
         'cited_by_count':  work.get('cited_by_count', 0),
         'authorships':     authorships,
-        'grants':          grants,
+        'grants':          funders,
     }
 
 
