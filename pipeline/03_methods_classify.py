@@ -1,17 +1,17 @@
 """
-pipeline/02_topic_classify.py
+pipeline/03_methods_classify.py
 
-Classifies all works in the corpus into the topic taxonomy using
+Classifies all works in the corpus into the methods taxonomy using
 claude-haiku-4-5. Async, resumable, writes to DuckDB after every chunk.
 
 Usage:
-    uv run python pipeline/02_topic_classify.py          # full run
-    uv run python pipeline/02_topic_classify.py --test   # first 100 records only
-    uv run python pipeline/02_topic_classify.py --mock   # keyword-based mock (no API)
-    uv run python pipeline/02_topic_classify.py --test --mock
+    uv run python pipeline/03_methods_classify.py          # full run
+    uv run python pipeline/03_methods_classify.py --test   # first 100 records only
+    uv run python pipeline/03_methods_classify.py --mock   # keyword-based mock (no API)
+    uv run python pipeline/03_methods_classify.py --test --mock
 
-Run overnight (in parallel with 03_methods_classify.py):
-    caffeinate -i uv run python pipeline/02_topic_classify.py
+Run overnight (in parallel with 02_topic_classify.py):
+    caffeinate -i uv run python pipeline/03_methods_classify.py
 """
 
 import argparse
@@ -33,10 +33,10 @@ from pipeline.utils import pipeline_complete, truncate_abstract  # noqa: E402
 load_dotenv(override=True)
 
 DB           = 'data/global_health.duckdb'
-TAXONOMY_CSV = 'data/taxonomy/topic_taxonomy.csv'
+TAXONOMY_CSV = 'data/taxonomy/methods_taxonomy.csv'
 MODEL        = 'claude-haiku-4-5'
-CHUNK_SIZE   = 50   # concurrent requests; saturates Haiku rate limit safely
-MAX_TOKENS   = 20   # label only: "A|A04|high" is ~12 chars
+CHUNK_SIZE   = 10   # concurrent requests; conservative to avoid rate limits
+MAX_TOKENS   = 20   # label only: "M01|high" is ~10 chars
 MOCK         = False # set via --mock flag; bypasses API calls
 
 
@@ -52,19 +52,21 @@ def build_system_prompt() -> str:
     lines = []
     for r in rows:
         lines.append(
-            f"{r['subtopic_id']} — {r['subtopic_name']} [{r['category_letter']}]"
+            f"{r['method_id']} — {r['method_name']}: {r['method_description']}"
         )
     taxonomy_text = '\n'.join(lines)
 
-    return f"""Classify global health research abstracts into the taxonomy below.
+    return f"""Classify global health research papers by study methodology.
+You will receive the paper's title and abstract. Use BOTH to determine the method;
+the title often contains key signals (e.g. "a modelling study", "systematic review").
 
 Return ONLY this format (no explanation, no preamble):
-<category_letter>|<subtopic_id>|<confidence>
+<method_id>|<confidence>
 
 Where confidence is: high, med, or low
-Example: A|A04|high
+Example: M01|high
 
-If the abstract does not fit any subtopic, return: Z|Z00|low
+If the method cannot be determined, return: M18|low
 
 Taxonomy:
 {taxonomy_text}"""
@@ -75,23 +77,23 @@ Taxonomy:
 # ---------------------------------------------------------------------------
 
 def _load_taxonomy_keywords() -> list[dict]:
-    """Build keyword lists from taxonomy subtopic names for mock matching."""
+    """Build keyword lists from taxonomy names and descriptions for mock matching."""
     with open(TAXONOMY_CSV) as f:
         rows = list(csv.DictReader(f))
     entries = []
     for r in rows:
-        # Split subtopic name into searchable keywords, drop short words
-        name = r['subtopic_name'].lower()
+        # Combine method name and description for richer keyword pool
+        text = f"{r['method_name']} {r['method_description']}".lower()
         # Remove parenthetical abbreviations to get real words
-        name_clean = re.sub(r'\([^)]*\)', '', name)
-        words = [w.strip('.,&') for w in re.split(r'[\s/]+', name_clean)]
+        text_clean = re.sub(r'\([^)]*\)', '', text)
+        words = [w.strip('.,&:') for w in re.split(r'[\s/]+', text_clean)]
         keywords = [w for w in words if len(w) >= 4 and w not in {
             'with', 'from', 'into', 'that', 'this', 'have', 'been',
             'their', 'than', 'also', 'were', 'does', 'such', 'other',
+            'methods', 'study', 'data', 'analysis',
         }]
         entries.append({
-            'category': r['category_letter'],
-            'subtopic': r['subtopic_id'],
+            'method_id': r['method_id'],
             'keywords': keywords,
         })
     return entries
@@ -100,13 +102,13 @@ def _load_taxonomy_keywords() -> list[dict]:
 _MOCK_TAXONOMY: list[dict] = []
 
 
-def mock_classify(abstract: str) -> str:
-    """Classify abstract by keyword overlap with taxonomy subtopic names."""
+def mock_classify(title: str, abstract: str) -> str:
+    """Classify by keyword overlap with taxonomy method names/descriptions."""
     global _MOCK_TAXONOMY
     if not _MOCK_TAXONOMY:
         _MOCK_TAXONOMY = _load_taxonomy_keywords()
 
-    text = abstract.lower()
+    text = f"{title} {abstract}".lower()
     best_score = 0
     best_entry = None
 
@@ -118,11 +120,11 @@ def mock_classify(abstract: str) -> str:
 
     if best_entry and best_score >= 2:
         conf = 'high' if best_score >= 4 else 'med' if best_score >= 3 else 'low'
-        return f"{best_entry['category']}|{best_entry['subtopic']}|{conf}"
+        return f"{best_entry['method_id']}|{conf}"
 
-    # Fallback: pick a random subtopic with low confidence
+    # Fallback: pick a random method with low confidence
     entry = random.choice(_MOCK_TAXONOMY)
-    return f"{entry['category']}|{entry['subtopic']}|low"
+    return f"{entry['method_id']}|low"
 
 
 # ---------------------------------------------------------------------------
@@ -146,32 +148,33 @@ def _is_retryable(exc: BaseException) -> bool:
     stop=stop_after_attempt(5),
     retry=retry_if_exception(_is_retryable),
 )
-async def classify_one(openalex_id: str, abstract: str, system: str) -> tuple[str, str]:
+async def classify_one(openalex_id: str, title: str, abstract: str, system: str) -> tuple[str, str]:
     """Returns (openalex_id, raw_label_string)."""
+    user_content = f"Title: {title}\n\nAbstract: {truncate_abstract(abstract)}"
     msg = await client.messages.create(
         model=MODEL,
         max_tokens=MAX_TOKENS,
         system=system,
-        messages=[{'role': 'user', 'content': truncate_abstract(abstract)}],
+        messages=[{'role': 'user', 'content': user_content}],
     )
     return openalex_id, msg.content[0].text.strip()
 
 
 async def classify_batch(
-    batch: list[tuple[str, str]], system: str
+    batch: list[tuple[str, str, str]], system: str
 ) -> list[tuple[str, str]]:
     # Mock mode: skip API entirely, use keyword matching
     if MOCK:
-        return [(oid, mock_classify(abstract)) for oid, abstract in batch]
+        return [(oid, mock_classify(title, abstract)) for oid, title, abstract in batch]
 
-    tasks = [classify_one(oid, abstract, system) for oid, abstract in batch]
+    tasks = [classify_one(oid, title, abstract, system) for oid, title, abstract in batch]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     # On exception, return a low-confidence fallback so the row is still written
     out = []
     for i, r in enumerate(results):
         if isinstance(r, Exception):
             print(f'  WARNING: classify_one failed for {batch[i][0]}: {r}')
-            out.append((batch[i][0], 'Z|Z00|low'))
+            out.append((batch[i][0], 'M18|low'))
         else:
             out.append(r)
     return out
@@ -181,11 +184,11 @@ async def classify_batch(
 # DB helpers
 # ---------------------------------------------------------------------------
 
-def load_unclassified(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str]]:
+def load_unclassified(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str, str]]:
     rows = con.execute("""
-        SELECT openalex_id, abstract
+        SELECT openalex_id, title, abstract
         FROM works
-        WHERE classified_topic = FALSE
+        WHERE classified_method = FALSE
           AND abstract IS NOT NULL
           AND LENGTH(abstract) > 50
         ORDER BY publication_year DESC
@@ -193,13 +196,42 @@ def load_unclassified(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str]]:
     return rows
 
 
-def parse_label(raw: str) -> tuple[str, str, str]:
-    """Parse 'A|A04|high' → (category, subtopic, confidence)."""
-    parts = [p.strip() for p in raw.split('|')]
-    if len(parts) == 3:
-        return parts[0], parts[1], parts[2]
-    # Malformed response — mark as unclassified
-    return 'Z', 'Z00', 'low'
+def parse_label(raw: str) -> tuple[str, str]:
+    """Parse 'M01|high' → (method_id, confidence).
+
+    Handles common model response variants:
+    - 'M01|high'           → standard 2-part format
+    - 'M01|high\\n...'     → extra text after label (take first line)
+    - 'M01'                → missing confidence (default to 'med')
+    - 'M1|high'            → single-digit ID (normalize to M01)
+    """
+    # Take only the first line — model sometimes appends explanation
+    first_line = raw.split('\n')[0].strip()
+    parts = [p.strip() for p in first_line.split('|')]
+
+    valid_conf = {'high', 'med', 'low'}
+    valid_ids = {f'M{i:02d}' for i in range(1, 19)}
+
+    if len(parts) >= 2:
+        method_id, conf = parts[0], parts[1]
+        if conf not in valid_conf:
+            conf = 'low'
+        # Normalize single-digit: M1 → M01
+        if re.match(r'^M\d$', method_id):
+            method_id = f'M0{method_id[1]}'
+        if method_id in valid_ids:
+            return method_id, conf
+
+    if len(parts) == 1:
+        method_id = parts[0]
+        # Normalize single-digit: M1 → M01
+        if re.match(r'^M\d$', method_id):
+            method_id = f'M0{method_id[1]}'
+        if method_id in valid_ids:
+            return method_id, 'med'
+
+    # Malformed response — mark as unclear
+    return 'M18', 'low'
 
 
 def write_results(
@@ -208,16 +240,15 @@ def write_results(
 ):
     rows = []
     for openalex_id, raw in results:
-        category, subtopic, confidence = parse_label(raw)
-        rows.append((category, subtopic, confidence, openalex_id))
+        method_id, confidence = parse_label(raw)
+        rows.append((method_id, confidence, openalex_id))
 
     con.executemany(
         """
         UPDATE works
-        SET topic_category   = ?,
-            topic_subtopic   = ?,
-            topic_confidence = ?,
-            classified_topic = TRUE
+        SET method_type       = ?,
+            method_confidence = ?,
+            classified_method = TRUE
         WHERE openalex_id = ?
         """,
         rows,
@@ -250,10 +281,10 @@ def main():
     if MOCK:
         mode_parts.append('MOCK')
     mode_label = f' [{" + ".join(mode_parts)}]' if mode_parts else ''
-    print(f'Classifying {len(rows):,} unclassified works...{mode_label}')
+    print(f'Classifying {len(rows):,} unclassified works (methods)...{mode_label}')
 
     if not rows:
-        print('Nothing to classify. All works already have topic labels.')
+        print('Nothing to classify. All works already have method labels.')
         con.close()
         return
 
@@ -269,7 +300,7 @@ def main():
         print(f'  {total:,}/{len(rows):,} ({pct:.1f}%) classified')
 
     con.close()
-    pipeline_complete('02_topic_classify')
+    pipeline_complete('03_methods_classify')
 
 
 if __name__ == '__main__':

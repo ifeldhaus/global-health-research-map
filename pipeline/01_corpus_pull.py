@@ -29,7 +29,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from pipeline.utils import pipeline_complete  # noqa: E402
 
-load_dotenv()
+load_dotenv(override=True)
 
 EMAIL   = os.getenv('OPENALEX_EMAIL', 'researcher@example.com')
 DB      = 'data/global_health.duckdb'
