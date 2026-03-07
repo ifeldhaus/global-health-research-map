@@ -1,21 +1,21 @@
-canonical_name,funder_category,funder_country,openalex_id,aliases
+﻿canonical_name,funder_category,funder_country,openalex_id,aliases
 National Institutes of Health,Government,US,F4320332161,NIH|US NIH|National Institute of Health|National Institutes of Health USA|NIH USA|Institutos Nacionales de la Salud
 Wellcome Trust,Philanthropic,UK,F4320311904,Wellcome|The Wellcome Trust|Wellcome Trust UK|WT
 Bill & Melinda Gates Foundation,Philanthropic,US,F4320306137,Gates Foundation|BMGF|Bill and Melinda Gates Foundation|Gates|The Bill & Melinda Gates Foundation|The Bill and Melinda Gates Foundation|B&MGF|GF
 USAID,Government,US,F4320306115,US Agency for International Development|United States Agency for International Development|USAID USA|U.S. Agency for International Development|Agency for International Development
 UK Foreign Commonwealth & Development Office,Government,UK,F4320330760,"FCDO|Foreign Commonwealth and Development Office|Foreign, Commonwealth & Development Office|Foreign, Commonwealth & Development Office, UK Government|UK Government|Ministry of Foreign Affairs of the United Kingdom"
-European Commission,Government,Multilateral,F4320320300,EU|European Union|EC|European Research Council|ERC|Horizon 2020|EU Commission|Europeiska kommissionen|____�_____ _�____�__|Comisia European_|Europese Commissie|Euroopa Komisjoni|Eiropas Komisiju|Euroopan komission|Europskoj komisiji|Choimisi�in Eorpaigh|EU-Kommissionen|Evropski komisiji|Comisi�n Europea|Europos Komisijos|Europ�ische Kommission|La Commissione europea|Evropsk� komise|Comiss�o Europeia|Eur�pskej komisii|____________ _______|Eur�pai Bizotts�gr�l|Komisja Europejska|Commissione europea|European Union|Commission europ�enne
+European Commission,Government,Multilateral,F4320320300,EU|European Union|EC|European Research Council|ERC|Horizon 2020|EU Commission|Europeiska kommissionen|Европейска комисия|Comisia Europeană|Europese Commissie|Euroopa Komisjoni|Eiropas Komisiju|Euroopan komission|Europskoj komisiji|Choimisiún Eorpaigh|EU-Kommissionen|Evropski komisiji|Comisión Europea|Europos Komisijos|Europäische Kommission|La Commissione europea|Evropská komise|Comissão Europeia|Európskej komisii|Европейская комиссия|Európai Bizottságról|Komisja Europejska|Commissione europea|Commission européenne
 Global Fund to Fight AIDS TB and Malaria,Multilateral,Multilateral,F4320307851,"Global Fund|The Global Fund|GFATM|Fonds mondial|The Global Fund to Fight AIDS, Tuberculosis and Malaria|Le Fonds mondial|Fonds mondial de lutte contre le sida, la tuberculose et le paludisme"
 Gavi the Vaccine Alliance,Multilateral,Multilateral,F4320306348,Gavi|GAVI|Gavi Alliance|Gavi Vaccine Alliance|Global Alliance for Vaccines and Immunization
 World Health Organization,UN Agency,Multilateral,F4320307856,WHO|World Health Organisation
 Swiss National Science Foundation,Government,Switzerland,F4320320924,SNSF|Swiss NSF|Schweizerischer Nationalfonds|Fondo Nazionale Svizzero|Fonds National Suisse|Schweizerische Nationalfonds|Fondo Nazionale Svizzero per la Ricerca Scientifica|Fonds National Suisse de la Recherche Scientifique|Swiss National Science Foundation|FNS|SNF|Schweizerischer Nationalfonds
-Canadian Institutes of Health Research,Government,Canada,F4320334506,CIHR|Canadian Institutes of Health|Instituts de recherche en sant� du Canada|IRSC
+Canadian Institutes of Health Research,Government,Canada,F4320334506,CIHR|Canadian Institutes of Health|Instituts de recherche en santé du Canada|IRSC
 Australian National Health and Medical Research Council,Government,Australia,F4320334705,NHMRC|Australian NHMRC|National Health and Medical Research Council Australia|National Health and Medical Research Council
 Bloomberg Philanthropies,Philanthropic,US,F4320315694,Bloomberg|Bloomberg Foundation
 Rockefeller Foundation,Philanthropic,US,F4320306149,Rockefeller|The Rockefeller Foundation|Rockefeller Fdn
 MRC UK,Government,UK,F4320334626,Medical Research Council|UK MRC|MRC|Medical Research Council UK| UK Medical Research Council
 PEPFAR,Government,US,F4320310979,President's Emergency Plan for AIDS Relief|US PEPFAR|U.S. President's Emergency Plan for AIDS Relief
-World Bank,Multilateral,Multilateral,F4320307855,World Bank Group|The World Bank|International Bank for Reconstruction and Development|______ _____ ______|WBG|Groupe Banque Mondiale|Banco Mundial|Grupo Banco Mundial|The World Bank Group|____|______ __________ _____|Banque Mondiale
+World Bank,Multilateral,Multilateral,F4320307855,World Bank Group|The World Bank|International Bank for Reconstruction and Development|البنك الدولي|WBG|Groupe Banque Mondiale|Banco Mundial|Grupo Banco Mundial|The World Bank Group|世界银行|Всемирный банк|Banque Mondiale
 African Development Bank,Multilateral,Multilateral,F4320307857,AfDB|African Development Bank Group
 PATH,NGO,US,F4320308612,Program for Appropriate Technology in Health|PATH International
 UK DFID,Government,UK,F4320321637,DFID|Department for International Development|UK Department for International Development
