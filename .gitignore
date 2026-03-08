@@ -15,5 +15,14 @@ __pycache__/
 *.pyc
 .venv/
 
+# Agents (generated output, not versioned)
+agents/
+
+# Generated figures and docs
+docs/figures/
+docs/findings_draft.md
+docs/findings_data.json
+docs/content_drafts.md
+
 # OS
 .DS_Store
