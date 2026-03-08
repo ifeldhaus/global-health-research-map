@@ -24,5 +24,11 @@ docs/findings_draft.md
 docs/findings_data.json
 docs/content_drafts.md
 
+# Validation outputs (generated, not versioned)
+validation/validation_sample.csv
+validation/validation_sample_labeled.csv
+validation/confusion_matrices/
+validation/VALIDATION_REPORT.md
+
 # OS
 .DS_Store
