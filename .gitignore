@@ -10,6 +10,9 @@
 data/raw/*.jsonl
 data/processed/*.parquet
 
+# GBD data (downloaded from IHME, not versioned)
+data/gbd/
+
 # Python
 __pycache__/
 *.pyc
