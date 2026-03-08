@@ -1,0 +1,23 @@
+topic_category,topic_name,gbd_cause,notes
+A,Maternal & Reproductive Health,Maternal and neonatal disorders,Includes neonatal; best proxy at Level 2
+C,Infectious Disease,Enteric infections,Diarrheal and enteric infections
+C,Infectious Disease,Other infectious diseases,Non-NTD non-HIV/TB/Malaria infectious diseases
+D,HIV / AIDS / TB / Malaria,HIV/AIDS and sexually transmitted infections,Includes HIV/AIDS and STIs
+D,HIV / AIDS / TB / Malaria,Respiratory infections and tuberculosis,TB and lower respiratory infections
+E,Neglected Tropical Diseases,Neglected tropical diseases and malaria,Combined GBD Level 2 category
+F,Non-Communicable Diseases,Neoplasms,All cancers
+F,Non-Communicable Diseases,Cardiovascular diseases,Direct match
+F,Non-Communicable Diseases,Chronic respiratory diseases,COPD and asthma
+F,Non-Communicable Diseases,Digestive diseases,Direct match
+F,Non-Communicable Diseases,Diabetes and kidney diseases,Direct match
+F,Non-Communicable Diseases,Neurological disorders,Direct match
+F,Non-Communicable Diseases,Musculoskeletal disorders,Direct match
+F,Non-Communicable Diseases,Skin and subcutaneous diseases,Direct match
+F,Non-Communicable Diseases,Sense organ diseases,Direct match
+F,Non-Communicable Diseases,Other non-communicable diseases,GBD catch-all
+G,Mental Health & Substance Use,Mental disorders,Direct match
+G,Mental Health & Substance Use,Substance use disorders,Direct match
+H,Nutrition & Micronutrient Deficiency,Nutritional deficiencies,Direct match
+M,Surgical Trauma & Emergency Care,Transport injuries,Road traffic injuries
+M,Surgical Trauma & Emergency Care,Unintentional injuries,Falls burns drowning poisoning
+M,Surgical Trauma & Emergency Care,Self-harm and interpersonal violence,Violence and self-harm trauma
