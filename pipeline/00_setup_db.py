@@ -92,33 +92,37 @@ con.execute("""
 
 # ---------------------------------------------------------------------------
 # WHO Global Burden of Disease data
-# Loaded from data/gbd/ CSVs by a one-off notebook before analysis
+# Loaded from data/gbd/ CSVs by pipeline/07_gbd_burden.py
+# See docs/gbd_burden_methodology.md for design decisions
 # ---------------------------------------------------------------------------
 con.execute("""
     CREATE TABLE IF NOT EXISTS gbd_burden (
         cause        VARCHAR,
         region       VARCHAR,
         year         INTEGER,
-        metric       VARCHAR,   -- 'DALYs', 'Deaths', 'YLDs', 'YLLs'
+        measure      VARCHAR,   -- 'DALYs', 'Deaths'
+        metric       VARCHAR,   -- 'Number', 'Percent', 'Rate'
         sex          VARCHAR,
         age_group    VARCHAR,
         val          DOUBLE,
         upper        DOUBLE,
         lower        DOUBLE,
-        PRIMARY KEY (cause, region, year, metric, sex, age_group)
+        PRIMARY KEY (cause, region, year, measure, metric, sex, age_group)
     )
 """)
 
 # ---------------------------------------------------------------------------
 # Manual mapping: research topic category -> GBD cause category
-# Populated by hand in data/taxonomy/topic_burden_map.csv, loaded once
+# Populated by hand in data/taxonomy/topic_burden_map.csv, loaded by
+# pipeline/07_gbd_burden.py.  Multiple GBD causes can map to one topic.
 # ---------------------------------------------------------------------------
 con.execute("""
     CREATE TABLE IF NOT EXISTS topic_burden_map (
-        topic_category  VARCHAR PRIMARY KEY,
+        topic_category  VARCHAR,
         topic_name      VARCHAR,
         gbd_cause       VARCHAR,
-        notes           VARCHAR
+        notes           VARCHAR,
+        PRIMARY KEY (topic_category, gbd_cause)
     )
 """)
 
