@@ -23,7 +23,7 @@ def page():
     st.title('Overview')
     st.caption(
         'Corpus summary across ~100,000 global health research papers '
-        '(2010\u20132024) from 10 core journals.'
+        '(2010\u20132024) from 11 core journals.'
     )
 
     if not check_data_ready():
