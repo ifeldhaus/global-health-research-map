@@ -171,10 +171,11 @@ async def classify_batch(
 
     tasks = [classify_one(oid, abstract, system) for oid, abstract in batch]
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    out = []
-    for i, r in enumerate(results):
+
+    # Check for billing errors first — if any task hit it, abort the
+    # entire batch without writing anything.
+    for r in results:
         if isinstance(r, Exception):
-            # Detect billing/credits errors — stop immediately, don't write junk
             err_msg = str(r).lower()
             if 'credit balance' in err_msg or 'billing' in err_msg:
                 raise BillingError(
@@ -182,8 +183,13 @@ async def classify_batch(
                     'Top up credits at https://console.anthropic.com/settings/billing\n'
                     'then re-run this script — it will resume where it left off.'
                 )
-            print(f'  WARNING: classify_one failed for {batch[i][0]}: {r}')
-            out.append((batch[i][0], 'Z|Z00|low'))
+
+    # Only include successful results; skip failures so they remain
+    # unclassified and will be retried on the next run.
+    out = []
+    for i, r in enumerate(results):
+        if isinstance(r, Exception):
+            print(f'  WARNING: skipping {batch[i][0]} (will retry next run): {r}')
         else:
             out.append(r)
     return out
@@ -312,8 +318,9 @@ def main():
             print(f'  Progress saved: {total:,}/{len(rows):,} classified so far.')
             con.close()
             return
-        write_results(con, results)
-        total += len(chunk)
+        if results:
+            write_results(con, results)
+        total += len(results)
         pct    = total / len(rows) * 100
         print(f'  {total:,}/{len(rows):,} ({pct:.1f}%) classified')
 
