@@ -227,6 +227,11 @@ async def classify_one(
     return openalex_id, msg.content[0].text.strip()
 
 
+class BillingError(Exception):
+    """Raised when the API returns a billing/credits error."""
+    pass
+
+
 async def classify_batch(
     batch: list[tuple[str, str, str]], system: str,
 ) -> list[tuple[str, str]]:
@@ -244,6 +249,13 @@ async def classify_batch(
     out = []
     for i, r in enumerate(results):
         if isinstance(r, Exception):
+            err_msg = str(r).lower()
+            if 'credit balance' in err_msg or 'billing' in err_msg:
+                raise BillingError(
+                    'API credit balance too low. The script will stop now.\n'
+                    'Top up credits at https://console.anthropic.com/settings/billing\n'
+                    'then re-run this script — it will resume where it left off.'
+                )
             print(f'  WARNING: classify_one failed for {batch[i][0]}: {r}')
             out.append((batch[i][0], 'UNKNOWN|low'))
         else:
@@ -390,7 +402,13 @@ def main():
 
     for i in range(0, len(rows), CHUNK_SIZE):
         chunk = rows[i:i + CHUNK_SIZE]
-        results = asyncio.run(classify_batch(chunk, system))
+        try:
+            results = asyncio.run(classify_batch(chunk, system))
+        except BillingError as e:
+            print(f'\n✗ {e}')
+            print(f'  Progress saved: {total:,}/{len(rows):,} classified so far.')
+            con.close()
+            return
         write_results(con, results)
         total += len(chunk)
         pct = total / len(rows) * 100

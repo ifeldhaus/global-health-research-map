@@ -176,12 +176,12 @@ def parse_work(work: dict, issn: str) -> dict:
         inst   = (a.get('institutions') or [{}])[0]
         author = a.get('author', {})
         authorships.append({
-            'author_id':          author.get('id', ''),
-            'author_name':        author.get('display_name', ''),
-            'position':           a.get('author_position', ''),
-            'institution_id':     inst.get('id', ''),
-            'institution_name':   inst.get('display_name', ''),
-            'institution_country': inst.get('country_code', ''),
+            'author_id':          author.get('id') or '',
+            'author_name':        author.get('display_name') or '',
+            'position':           a.get('author_position') or '',
+            'institution_id':     inst.get('id') or '',
+            'institution_name':   inst.get('display_name') or '',
+            'institution_country': inst.get('country_code') or '',
         })
 
     funders = []
