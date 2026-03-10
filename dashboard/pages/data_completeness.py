@@ -106,9 +106,9 @@ def page():
 
     metric_row([
         ('Total papers', total, None),
-        ('Usable abstract', f"{classifiable:,} ({pct_classifiable:.0f}%)", None),
-        ('Missing / unusable', f"{missing:,} ({pct_missing:.0f}%)", None),
-        ('Topic classified', f"{topic_classified:,} ({pct_topic:.0f}% of usable)", None),
+        ('Usable abstract', classifiable, f"{pct_classifiable:.0f}% of total"),
+        ('Missing abstract', missing, f"{pct_missing:.0f}% of total"),
+        ('Topic classified', topic_classified, f"{pct_topic:.0f}% of usable"),
     ])
 
     # =====================================================================
