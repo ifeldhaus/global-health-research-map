@@ -104,12 +104,18 @@ def page():
     pct_classifiable = (classifiable / total * 100) if total else 0
     pct_topic = (topic_classified / classifiable * 100) if classifiable else 0
 
-    metric_row([
-        ('Total papers', total, None),
-        ('Usable abstract', classifiable, f"{pct_classifiable:.0f}% of total"),
-        ('Missing abstract', missing, f"{pct_missing:.0f}% of total"),
-        ('Topic classified', topic_classified, f"{pct_topic:.0f}% of usable"),
-    ], delta_color='off')
+    cols = st.columns(4)
+    with cols[0]:
+        st.metric('Total papers', f"{total:,}")
+    with cols[1]:
+        st.metric('Usable abstract', f"{classifiable:,}")
+        st.caption(f"{pct_classifiable:.0f}% of total")
+    with cols[2]:
+        st.metric('Missing abstract', f"{missing:,}")
+        st.caption(f"{pct_missing:.0f}% of total")
+    with cols[3]:
+        st.metric('Topic classified', f"{topic_classified:,}")
+        st.caption(f"{pct_topic:.0f}% of usable")
 
     # =====================================================================
     # 2. Abstract availability by journal
