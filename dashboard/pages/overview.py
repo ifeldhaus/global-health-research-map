@@ -14,6 +14,7 @@ from dashboard.components import (
 )
 from dashboard.constants import (
     TOPIC_COLORS, TOPIC_LABELS, METHOD_LABELS, GENDER_COLORS,
+    UNCATEGORIZED_TOPICS, NON_EMPIRICAL_METHODS,
     CHART_TEMPLATE, CHART_HEIGHT, iso2_to_country_name,
 )
 from dashboard.db import query_df, query_scalar, build_where_clause
@@ -104,12 +105,14 @@ def page():
         'Based on LLM-classified topic categories (A\u2013O).',
     )
 
+    uc_placeholders = ', '.join(['?'] * len(UNCATEGORIZED_TOPICS))
     df_topic = query_df(
         f"""SELECT topic_category AS cat, COUNT(*) AS n
             FROM works w
             {base_where} AND classified_topic = TRUE
+            AND topic_category NOT IN ({uc_placeholders})
             GROUP BY topic_category ORDER BY n DESC""",
-        tuple(params),
+        tuple(params) + UNCATEGORIZED_TOPICS,
     )
 
     if not df_topic.empty:
@@ -140,12 +143,14 @@ def page():
         'Study methodology types across the corpus.',
     )
 
+    ne_placeholders = ', '.join(['?'] * len(NON_EMPIRICAL_METHODS))
     df_method = query_df(
         f"""SELECT method_type AS method, COUNT(*) AS n
             FROM works w
             {base_where} AND classified_method = TRUE
+            AND method_type NOT IN ({ne_placeholders})
             GROUP BY method_type ORDER BY n DESC""",
-        tuple(params),
+        tuple(params) + NON_EMPIRICAL_METHODS,
     )
 
     if not df_method.empty:
@@ -174,7 +179,7 @@ def page():
         f"""SELECT study_country AS country, COUNT(*) AS n
             FROM works w
             {base_where} AND study_country IS NOT NULL
-              AND study_country != 'GLOBAL'
+              AND study_country NOT IN ('GLOBAL', 'UNKNOWN')
             GROUP BY study_country ORDER BY n DESC LIMIT 20""",
         tuple(params),
     )

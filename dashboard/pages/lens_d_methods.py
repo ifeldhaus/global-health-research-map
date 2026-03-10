@@ -22,6 +22,7 @@ from dashboard.components import (
 )
 from dashboard.constants import (
     TOPIC_LABELS, METHOD_LABELS, TOPIC_COLORS, NON_EMPIRICAL_METHODS,
+    UNCATEGORIZED_TOPICS,
     CHART_TEMPLATE, CHART_HEIGHT, CHART_HEIGHT_TALL, DIVERGING_COLORSCALE,
 )
 from dashboard.db import query_df, query_scalar, build_where_clause
@@ -45,8 +46,11 @@ def page():
     ne_placeholders = ', '.join(['?'] * len(NON_EMPIRICAL_METHODS))
     ne_clause = (f" AND (w.method_type IS NULL "
                  f"OR w.method_type NOT IN ({ne_placeholders}))")
-    base_where = f"WHERE TRUE {where}{ne_clause}"
-    params = params + list(NON_EMPIRICAL_METHODS)
+    # Exclude uncategorized topics from visualizations
+    uc_placeholders = ', '.join(['?'] * len(UNCATEGORIZED_TOPICS))
+    uc_clause = f" AND (w.topic_category IS NULL OR w.topic_category NOT IN ({uc_placeholders}))"
+    base_where = f"WHERE TRUE {where}{ne_clause}{uc_clause}"
+    params = params + list(NON_EMPIRICAL_METHODS) + list(UNCATEGORIZED_TOPICS)
 
     # ------------------------------------------------------------------
     # Methods overview
