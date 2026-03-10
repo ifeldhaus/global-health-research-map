@@ -66,15 +66,17 @@ def pipeline_progress_card():
             st.progress(pct / 100, text=f"{label}: {done:,}/{total:,} ({pct:.0f}%)")
 
 
-def metric_row(metrics: list[tuple[str, str | int | float, str | None]]):
+def metric_row(metrics: list[tuple[str, str | int | float, str | None]],
+               delta_color: str = 'normal'):
     """Render a row of st.metric cards.
 
     Each metric is (label, value, delta_or_none).
+    delta_color: 'normal' (green/red arrows), 'off' (plain gray text).
     """
     cols = st.columns(len(metrics))
     for col, (label, value, delta) in zip(cols, metrics):
         display_val = f"{value:,}" if isinstance(value, (int, float)) else value
-        col.metric(label, display_val, delta)
+        col.metric(label, display_val, delta, delta_color=delta_color)
 
 
 def section_header(title: str, description: str | None = None):
