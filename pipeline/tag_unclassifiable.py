@@ -10,6 +10,8 @@ Values:
     'no_abstract'           — OpenAlex has no abstract for this paper
     'insufficient_abstract' — abstract field is present but too short / junk
                               (≤ 50 chars: funder names, "None.", registration IDs, etc.)
+    'boilerplate_abstract'  — abstract field contains journal boilerplate text
+                              instead of a real abstract (e.g. Annals of Global Health)
 
 The script is idempotent — safe to re-run at any time (e.g. after new data
 loads or after running classification scripts).
@@ -26,6 +28,14 @@ DB = 'data/global_health.duckdb'
 
 # Must match the threshold in 02_topic_classify.py and 03_methods_classify.py
 MIN_ABSTRACT_LENGTH = 50
+
+# Boilerplate patterns — journal descriptions stored by OpenAlex instead of
+# real abstracts.  Must stay in sync with JUNK_ABSTRACT_PATTERNS in
+# 02_topic_classify.py.
+BOILERPLATE_PATTERNS = [
+    "Annals of Global Health is a peer-reviewed%",
+    "Welcome to Annals of Global Health%",
+]
 
 
 def main():
@@ -53,6 +63,12 @@ def main():
     else:
         print('Column `classification_note` already exists.')
 
+    # ── Build boilerplate SQL clause ─────────────────────────────────
+    bp_or_clauses = ' OR '.join(
+        f"abstract LIKE '{pat}'" for pat in BOILERPLATE_PATTERNS
+    )
+    bp_where = f"({bp_or_clauses})"
+
     # ── Count what would be tagged ───────────────────────────────────
     no_abstract = con.execute("""
         SELECT COUNT(*) FROM works
@@ -66,13 +82,21 @@ def main():
           AND LENGTH(TRIM(abstract)) <= {MIN_ABSTRACT_LENGTH}
     """).fetchone()[0]
 
+    boilerplate = con.execute(f"""
+        SELECT COUNT(*) FROM works
+        WHERE abstract IS NOT NULL
+          AND LENGTH(TRIM(abstract)) > {MIN_ABSTRACT_LENGTH}
+          AND {bp_where}
+    """).fetchone()[0]
+
     classifiable = con.execute(f"""
         SELECT COUNT(*) FROM works
         WHERE abstract IS NOT NULL
           AND LENGTH(TRIM(abstract)) > {MIN_ABSTRACT_LENGTH}
+          AND NOT {bp_where}
     """).fetchone()[0]
 
-    total = no_abstract + insufficient + classifiable
+    total = no_abstract + insufficient + boilerplate + classifiable
 
     print()
     print(f'Total works:              {total:,}')
@@ -80,6 +104,8 @@ def main():
           f'({no_abstract/total*100:.1f}%)')
     print(f'  insufficient_abstract:  {insufficient:,}  '
           f'({insufficient/total*100:.1f}%)')
+    print(f'  boilerplate_abstract:   {boilerplate:,}  '
+          f'({boilerplate/total*100:.1f}%)')
     print(f'  classifiable (NULL):    {classifiable:,}  '
           f'({classifiable/total*100:.1f}%)')
 
@@ -108,11 +134,21 @@ def main():
           AND LENGTH(TRIM(abstract)) <= {MIN_ABSTRACT_LENGTH}
     """).fetchone()[0]
 
+    n3 = con.execute(f"""
+        UPDATE works
+        SET classification_note = 'boilerplate_abstract'
+        WHERE abstract IS NOT NULL
+          AND LENGTH(TRIM(abstract)) > {MIN_ABSTRACT_LENGTH}
+          AND {bp_where}
+          AND classification_note IS NULL
+    """).fetchone()[0]
+
     con.close()
 
     print()
     print(f'✓ Tagged {n1:,} papers as no_abstract')
     print(f'✓ Tagged {n2:,} papers as insufficient_abstract')
+    print(f'✓ Tagged {n3:,} papers as boilerplate_abstract')
     print(f'✓ {classifiable:,} papers left as NULL (classifiable)')
 
 
