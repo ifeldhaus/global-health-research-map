@@ -198,6 +198,35 @@ TOPIC_LABELS = load_topic_labels()
 TOPIC_LABELS.setdefault('Z', 'Uncategorized / Other')
 METHOD_LABELS = load_method_labels()
 
+# ---------------------------------------------------------------------------
+# Journal ISSN → name mapping (loaded from journal_list.csv)
+# ---------------------------------------------------------------------------
+
+def load_journal_names() -> dict[str, str]:
+    """Map ISSN → journal name from data/journal_list.csv."""
+    names = {}
+    path = PROJECT_ROOT / 'data' / 'journal_list.csv'
+    if path.exists():
+        with open(path) as f:
+            for row in csv.DictReader(f):
+                names[row['issn']] = row['journal_name']
+    return names
+
+
+JOURNAL_NAMES = load_journal_names()
+
+
+# ---------------------------------------------------------------------------
+# Data completeness colors
+# ---------------------------------------------------------------------------
+
+COMPLETENESS_COLORS = {
+    'classifiable': '#2ca02c',            # green — has usable abstract
+    'no_abstract': '#d62728',             # red — no abstract in OpenAlex
+    'insufficient_abstract': '#ff7f0e',   # orange — junk/short abstract
+    'boilerplate_abstract': '#9467bd',    # purple — journal boilerplate
+}
+
 # Plotly chart defaults
 CHART_TEMPLATE = 'plotly_white'
 CHART_HEIGHT = 500
