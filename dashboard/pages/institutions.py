@@ -22,8 +22,8 @@ from dashboard.components import (
 )
 from dashboard.constants import (
     TOPIC_LABELS, METHOD_LABELS, TOPIC_COLORS, NON_EMPIRICAL_METHODS,
-    QUAL_PALETTE, CHART_TEMPLATE, CHART_HEIGHT, CHART_HEIGHT_TALL,
-    iso2_to_country_name,
+    UNCATEGORIZED_TOPICS, QUAL_PALETTE, CHART_TEMPLATE, CHART_HEIGHT,
+    CHART_HEIGHT_TALL, iso2_to_country_name,
 )
 from dashboard.db import query_df, query_scalar, build_where_clause
 
@@ -41,7 +41,14 @@ def page():
     year_range = st.session_state.get('year_range', (2010, 2024))
     topics = st.session_state.get('selected_topics', [])
     where, params = build_where_clause(year_range=year_range, topics=topics or None)
-    base_where = f"WHERE TRUE {where}"
+    # Exclude uncategorized topics and non-empirical methods from analysis
+    uc_placeholders = ', '.join(['?'] * len(UNCATEGORIZED_TOPICS))
+    uc_clause = f" AND (w.topic_category IS NULL OR w.topic_category NOT IN ({uc_placeholders}))"
+    ne_placeholders = ', '.join(['?'] * len(NON_EMPIRICAL_METHODS))
+    ne_clause = (f" AND (w.method_type IS NULL "
+                 f"OR w.method_type NOT IN ({ne_placeholders}))")
+    base_where = f"WHERE TRUE {where}{uc_clause}{ne_clause}"
+    params = params + list(UNCATEGORIZED_TOPICS) + list(NON_EMPIRICAL_METHODS)
 
     # ------------------------------------------------------------------
     # Top institutions

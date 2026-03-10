@@ -59,6 +59,11 @@ DIVERGING_COLORSCALE = 'RdBu_r'  # red = over, blue = under
 # and shown in supplementary sections for Funder Power & Institutions.
 NON_EMPIRICAL_METHODS = ('M15',)  # Commentary / Editorial / Perspective
 
+# Uncategorized topic categories to exclude from analytical charts.
+# These are kept in the detailed data table but removed from visualizations
+# because they don't represent a meaningful research area.
+UNCATEGORIZED_TOPICS = ('Z',)  # Other / Uncategorized
+
 # ---------------------------------------------------------------------------
 # WHO regions (ISO-2 → WHO region code)
 # ---------------------------------------------------------------------------

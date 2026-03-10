@@ -18,7 +18,8 @@ from dashboard.components import (
     check_data_ready, metric_row, section_header, download_csv_button,
 )
 from dashboard.constants import (
-    TOPIC_LABELS, NON_EMPIRICAL_METHODS, WHO_REGIONS, WHO_REGION_NAMES,
+    TOPIC_LABELS, NON_EMPIRICAL_METHODS, UNCATEGORIZED_TOPICS,
+    WHO_REGIONS, WHO_REGION_NAMES,
     CHART_TEMPLATE, CHART_HEIGHT, CHART_HEIGHT_TALL, iso2_to_country_name,
 )
 from dashboard.db import query_df, query_scalar, build_where_clause
@@ -42,8 +43,11 @@ def page():
     ne_placeholders = ', '.join(['?'] * len(NON_EMPIRICAL_METHODS))
     ne_clause = (f" AND (w.method_type IS NULL "
                  f"OR w.method_type NOT IN ({ne_placeholders}))")
-    base_where = f"WHERE TRUE {where}{ne_clause}"
-    params = params + list(NON_EMPIRICAL_METHODS)
+    # Exclude uncategorized topics from visualizations
+    uc_placeholders = ', '.join(['?'] * len(UNCATEGORIZED_TOPICS))
+    uc_clause = f" AND (w.topic_category IS NULL OR w.topic_category NOT IN ({uc_placeholders}))"
+    base_where = f"WHERE TRUE {where}{ne_clause}{uc_clause}"
+    params = params + list(NON_EMPIRICAL_METHODS) + list(UNCATEGORIZED_TOPICS)
 
     # ------------------------------------------------------------------
     # Page controls
