@@ -43,6 +43,7 @@ from dashboard.pages.lens_b_geographic import page as lens_b_page    # noqa: E40
 from dashboard.pages.lens_c_topics import page as lens_c_page        # noqa: E402
 from dashboard.pages.lens_d_methods import page as lens_d_page       # noqa: E402
 from dashboard.pages.institutions import page as institutions_page   # noqa: E402
+from dashboard.pages.data_completeness import page as data_completeness_page  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Navigation
@@ -64,6 +65,10 @@ pages = {
                 url_path='methods-gaps'),
         st.Page(institutions_page, title='Institutions', icon=':material/school:',
                 url_path='institutions'),
+    ],
+    'Data Quality': [
+        st.Page(data_completeness_page, title='Data Completeness',
+                icon=':material/fact_check:', url_path='data-completeness'),
     ],
 }
 
