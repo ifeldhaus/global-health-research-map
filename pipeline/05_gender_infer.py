@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import time
+import unicodedata
 
 import duckdb
 import requests
@@ -52,8 +53,24 @@ MOCK        = False
 # Name extraction
 # ---------------------------------------------------------------------------
 
+def strip_diacritics(s: str) -> str:
+    """Remove diacritical marks: 'José' → 'Jose', 'René' → 'Rene'.
+
+    Uses Unicode NFD decomposition to separate base characters from
+    combining marks, then discards the marks.
+    Reference: Santamaría & Mihaljević (2018), doi:10.7717/peerj-cs.156
+    """
+    nfkd = unicodedata.normalize('NFKD', s)
+    return ''.join(c for c in nfkd if unicodedata.category(c) != 'Mn')
+
+
 def extract_first_name(full_name: str | None) -> str | None:
     """Extract given name from a full author name.
+
+    Applies two corrections from Santamaría & Mihaljević (2018) to
+    improve genderize.io accuracy:
+    1. Strip diacritics (José → Jose)
+    2. Take first component of compound names (Jean-Pierre → Jean)
 
     Returns None for names that can't be meaningfully gendered:
     - None / empty input
@@ -75,6 +92,17 @@ def extract_first_name(full_name: str | None) -> str | None:
     # Skip initial-style tokens: "J-P", "J.-P"
     if re.match(r'^[A-Z]\W', first):
         return None
+
+    # Take first component of compound/hyphenated names:
+    # "Jean-Pierre" → "Jean", "Ana-María" → "Ana"
+    cleaned = cleaned.split('-')[0]
+
+    # Skip if the component is a single initial: "J" from "J-Pierre"
+    if len(cleaned) <= 1:
+        return None
+
+    # Strip diacritics: "José" → "Jose", "René" → "Rene"
+    cleaned = strip_diacritics(cleaned)
 
     return cleaned
 
