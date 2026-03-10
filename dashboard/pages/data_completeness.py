@@ -49,7 +49,7 @@ _STATUS_LABELS = {
     'classifiable': 'Usable abstract',
     'no_abstract': 'No abstract',
     'insufficient_abstract': 'Insufficient abstract',
-    'boilerplate_abstract': 'Boilerplate text',
+    'boilerplate_abstract': 'Journal description (not abstract)',
 }
 
 
