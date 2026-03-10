@@ -48,7 +48,7 @@ _STATUS_ORDER = ['classifiable', 'boilerplate_abstract',
 _STATUS_LABELS = {
     'classifiable': 'Usable abstract',
     'no_abstract': 'No abstract',
-    'insufficient_abstract': 'Insufficient abstract',
+    'insufficient_abstract': 'Insufficient abstract (\u226450 chars)',
     'boilerplate_abstract': 'Journal description (not abstract)',
 }
 
