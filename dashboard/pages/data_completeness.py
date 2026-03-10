@@ -109,7 +109,7 @@ def page():
         ('Usable abstract', classifiable, f"{pct_classifiable:.0f}% of total"),
         ('Missing abstract', missing, f"{pct_missing:.0f}% of total"),
         ('Topic classified', topic_classified, f"{pct_topic:.0f}% of usable"),
-    ])
+    ], delta_color='off')
 
     # =====================================================================
     # 2. Abstract availability by journal
