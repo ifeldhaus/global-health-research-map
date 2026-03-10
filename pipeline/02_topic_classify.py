@@ -56,7 +56,9 @@ def build_system_prompt() -> str:
         )
     taxonomy_text = '\n'.join(lines)
 
-    return f"""Classify global health research abstracts into the taxonomy below.
+    return f"""Classify global health research papers into the taxonomy below.
+You will receive the paper's title and abstract. Use BOTH to determine the topic;
+the title often contains key signals about the subject area.
 
 Return ONLY this format (no explanation, no preamble):
 <category_letter>|<subtopic_id>|<confidence>
@@ -64,7 +66,7 @@ Return ONLY this format (no explanation, no preamble):
 Where confidence is: high, med, or low
 Example: A|A04|high
 
-If the abstract does not fit any subtopic, return: Z|Z00|low
+If the paper does not fit any subtopic, return: Z|Z00|low
 
 Taxonomy:
 {taxonomy_text}"""
@@ -100,13 +102,13 @@ def _load_taxonomy_keywords() -> list[dict]:
 _MOCK_TAXONOMY: list[dict] = []
 
 
-def mock_classify(abstract: str) -> str:
-    """Classify abstract by keyword overlap with taxonomy subtopic names."""
+def mock_classify(title: str, abstract: str) -> str:
+    """Classify paper by keyword overlap with taxonomy subtopic names."""
     global _MOCK_TAXONOMY
     if not _MOCK_TAXONOMY:
         _MOCK_TAXONOMY = _load_taxonomy_keywords()
 
-    text = abstract.lower()
+    text = f"{title} {abstract}".lower()
     best_score = 0
     best_entry = None
 
@@ -146,13 +148,14 @@ def _is_retryable(exc: BaseException) -> bool:
     stop=stop_after_attempt(5),
     retry=retry_if_exception(_is_retryable),
 )
-async def classify_one(openalex_id: str, abstract: str, system: str) -> tuple[str, str]:
+async def classify_one(openalex_id: str, title: str, abstract: str, system: str) -> tuple[str, str]:
     """Returns (openalex_id, raw_label_string)."""
+    user_content = f"Title: {title}\n\nAbstract: {truncate_abstract(abstract)}"
     msg = await client.messages.create(
         model=MODEL,
         max_tokens=MAX_TOKENS,
         system=system,
-        messages=[{'role': 'user', 'content': truncate_abstract(abstract)}],
+        messages=[{'role': 'user', 'content': user_content}],
     )
     return openalex_id, msg.content[0].text.strip()
 
@@ -163,13 +166,13 @@ class BillingError(Exception):
 
 
 async def classify_batch(
-    batch: list[tuple[str, str]], system: str
+    batch: list[tuple[str, str, str]], system: str
 ) -> list[tuple[str, str]]:
     # Mock mode: skip API entirely, use keyword matching
     if MOCK:
-        return [(oid, mock_classify(abstract)) for oid, abstract in batch]
+        return [(oid, mock_classify(title, abstract)) for oid, title, abstract in batch]
 
-    tasks = [classify_one(oid, abstract, system) for oid, abstract in batch]
+    tasks = [classify_one(oid, title, abstract, system) for oid, title, abstract in batch]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     # Check for billing errors first — if any task hit it, abort the
@@ -189,7 +192,8 @@ async def classify_batch(
     out = []
     for i, r in enumerate(results):
         if isinstance(r, Exception):
-            print(f'  WARNING: skipping {batch[i][0]} (will retry next run): {r}')
+            oid = batch[i][0]
+            print(f'  WARNING: skipping {oid} (will retry next run): {r}')
         else:
             out.append(r)
     return out
@@ -199,13 +203,25 @@ async def classify_batch(
 # DB helpers
 # ---------------------------------------------------------------------------
 
-def load_unclassified(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str]]:
-    rows = con.execute("""
-        SELECT openalex_id, abstract
+# Boilerplate patterns that appear in the abstract field but aren't real
+# abstracts (e.g. journal descriptions stored by OpenAlex).
+JUNK_ABSTRACT_PATTERNS = [
+    'Annals of Global Health is a peer-reviewed%',
+    'Welcome to Annals of Global Health%',
+]
+
+
+def load_unclassified(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str, str]]:
+    junk_clauses = ' '.join(
+        f"AND abstract NOT LIKE '{pat}'" for pat in JUNK_ABSTRACT_PATTERNS
+    )
+    rows = con.execute(f"""
+        SELECT openalex_id, title, abstract
         FROM works
         WHERE classified_topic = FALSE
           AND abstract IS NOT NULL
           AND LENGTH(abstract) > 50
+          {junk_clauses}
         ORDER BY publication_year DESC
     """).fetchall()
     return rows
