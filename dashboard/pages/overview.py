@@ -23,9 +23,82 @@ from dashboard.db import query_df, query_scalar, build_where_clause
 def page():
     st.title('Overview')
     st.caption(
-        'Corpus summary across ~100,000 global health research papers '
+        'Corpus summary across global health research papers '
         '(2010\u20132024) from 11 core journals.'
     )
+
+    # ------------------------------------------------------------------
+    # About this dashboard — always visible at top
+    # ------------------------------------------------------------------
+    with st.expander(':material/menu_book: **About This Dashboard: Data Sources & Methods**',
+                     expanded=False):
+        st.markdown(
+            '### Data Sources\n\n'
+            'This dashboard draws on a bibliometric corpus of global health '
+            'research papers published between **2010 and 2024** in **11 core '
+            'journals** selected for their prominence in global health '
+            '(e.g., *The Lancet*, *BMJ Global Health*, *PLOS Medicine*). '
+            'Metadata for each paper \u2014 title, abstract, authors, '
+            'institutions, and funding acknowledgements \u2014 was retrieved '
+            'from [OpenAlex](https://openalex.org/), an open bibliometric '
+            'database.\n\n'
+            '### Classification Methods\n\n'
+            'Each paper with a usable abstract was enriched through four '
+            'AI-assisted classification steps:\n\n'
+            '1. **Topic classification** \u2014 Papers were classified into '
+            '15 topic categories (A\u2013O) using a large language model '
+            '(Claude) based on each paper\'s title and abstract. The '
+            'taxonomy covers major global health research areas such as '
+            'infectious diseases, non-communicable diseases, health '
+            'systems, and environmental health.\n'
+            '2. **Methods classification** \u2014 Each paper was assigned a '
+            'study design type (e.g., cross-sectional, cohort, RCT, '
+            'systematic review, qualitative) using the same LLM approach.\n'
+            '3. **Study country extraction** \u2014 The country or countries '
+            'where each study was conducted were identified from the '
+            'abstract.\n'
+            '4. **Gender inference** \u2014 The likely gender of first and last '
+            'authors was inferred probabilistically from given names '
+            'using a name-to-gender database. This approach has known '
+            'limitations for culturally ambiguous names.\n\n'
+            'Disease burden data from the '
+            '[Global Burden of Disease (GBD)](https://www.healthdata.org/research-analysis/gbd) '
+            'study is used in the Topic Trends lens to compare research '
+            'attention against actual disease burden (DALYs and deaths).\n\n'
+            '### Important Limitations\n\n'
+            '- **~25% of papers lack usable abstracts** in OpenAlex and '
+            'could not be topic- or method-classified. This missingness '
+            'is systematic \u2014 concentrated in specific journals '
+            '(see the [Data Completeness](/data-completeness) page for '
+            'details). Findings from topic, methods, and geographic '
+            'analyses should be interpreted with this in mind.\n'
+            '- **Classification is AI-assisted**, not manually validated '
+            'at scale. While the LLM performs well on clear-cut cases, '
+            'some papers (especially editorials and cross-cutting '
+            'commentary) may be mis-classified.\n'
+            '- **Funder data depends on OpenAlex metadata**, which '
+            'captures funding acknowledgements where publishers make '
+            'them available. Unfunded rates may reflect incomplete '
+            'metadata rather than true absence of funding.\n'
+            '- **Gender inference** is probabilistic and binary, which '
+            'does not capture the full spectrum of gender identity.\n\n'
+            '### How to Use This Dashboard\n\n'
+            'Use the **sidebar filters** to narrow by publication year, '
+            'topic category, or funder type. The dashboard is organized '
+            'into five analytical lenses:\n\n'
+            '- **Funder Power** \u2014 Who funds global health research and '
+            'how concentrated is funding?\n'
+            '- **Geographic Power** \u2014 Where is research conducted and by '
+            'whom? How prevalent is "parachute science"?\n'
+            '- **Topic Trends** \u2014 Does research attention align with '
+            'disease burden?\n'
+            '- **Methods Gaps** \u2014 Which study designs are under-utilized '
+            'for which topics?\n'
+            '- **Institutions** \u2014 Who produces global health research '
+            'and how concentrated is production?\n\n'
+            'The **Data Completeness** page provides full transparency on '
+            'data quality and missingness.'
+        )
 
     if not check_data_ready():
         pipeline_progress_card()
@@ -238,7 +311,12 @@ def page():
                 labels={'n': 'Papers', 'position': '', 'label': 'Gender'},
                 template=CHART_TEMPLATE,
             )
-            fig.update_layout(height=CHART_HEIGHT)
+            fig.update_traces(marker_line_width=0)
+            fig.update_layout(
+                height=CHART_HEIGHT,
+                bargap=0.25,
+                bargroupgap=0.1,
+            )
             st.plotly_chart(fig, use_container_width=True)
 
             # Methodology note

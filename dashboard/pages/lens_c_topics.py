@@ -274,10 +274,24 @@ def page():
                 fig.update_xaxes(title_text='Research Intensity Ratio')
                 st.plotly_chart(fig, use_container_width=True)
 
-                st.caption(
-                    'Red = over-researched (>1.5x), orange = slightly over (1\u20131.5x), '
-                    'blue = slightly under (0.5\u20131x), green = most under-researched (<0.5x). '
-                    'Compare both panels to see where DALYs and Deaths disagree.'
+                st.info(
+                    '**How to read this chart:** The research intensity ratio '
+                    'compares each topic\'s share of publications to its share '
+                    'of global disease burden. A ratio of **1.0** (the dashed '
+                    'parity line) means a topic receives research attention '
+                    'exactly proportional to its burden. **Above 1** = '
+                    'over-researched relative to burden; **below 1** = '
+                    'under-researched. The left panel uses DALYs '
+                    '(disability-adjusted life years, which capture both '
+                    'premature death and years lived with disability) while the '
+                    'right panel uses Deaths alone. Comparing the two reveals '
+                    'topics where the choice of burden measure changes the '
+                    'conclusion \u2014 for instance, mental health conditions '
+                    'cause significant DALYs but fewer deaths, so a topic may '
+                    'appear under-researched by DALYs but adequately covered '
+                    'by deaths. Color coding: red (>1.5x), orange (1\u20131.5x), '
+                    'blue (0.5\u20131x), green (<0.5x).',
+                    icon=':material/info:',
                 )
 
                 # Divergence highlights
@@ -314,6 +328,21 @@ def page():
             mapped_topics = query_df(
                 "SELECT DISTINCT topic_category FROM topic_burden_map "
                 "ORDER BY topic_category"
+            )
+
+            st.info(
+                '**How to read this chart:** Research intensity can change '
+                'for two reasons: (1) the topic\'s share of publications '
+                'changes (left panel), or (2) the disease burden itself '
+                'shifts (right panel). By plotting both side by side, you '
+                'can see whether a topic is becoming more neglected because '
+                'researchers moved away, because the burden grew, or both. '
+                'For example, if the left panel (publication share) is flat '
+                'but the right panel (burden share) is rising, the topic is '
+                'becoming under-researched not because of declining interest '
+                'but because the disease is worsening. The auto-generated '
+                'interpretation below each pair summarizes the key takeaway.',
+                icon=':material/info:',
             )
 
             if not mapped_topics.empty:

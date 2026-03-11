@@ -161,7 +161,7 @@ def page():
                     {base_where}
                     AND f.canonical_name = ?
                     AND w.study_country IS NOT NULL
-                    AND w.study_country != 'GLOBAL'
+                    AND w.study_country NOT IN ('GLOBAL', 'UNKNOWN')
                     GROUP BY w.study_country
                     ORDER BY n DESC LIMIT 15""",
                 tuple(params + [selected_funder]),
@@ -412,7 +412,7 @@ def page():
         fig.update_yaxes(title_text='Unique Funders', secondary_y=True)
         st.plotly_chart(fig, use_container_width=True)
 
-        st.caption(
+        st.info(
             '**How to read this chart:** The Herfindahl\u2013Hirschman Index '
             '(HHI) measures market concentration by summing the squared '
             'funding shares of all funders in a given year. Values range '
@@ -423,7 +423,8 @@ def page():
             'HHI over time, while the blue bars show how many unique '
             'funders were active each year. A rising HHI with stable '
             'funder counts suggests a few funders are capturing larger '
-            'shares; a falling HHI suggests diversification.'
+            'shares; a falling HHI suggests diversification.',
+            icon=':material/info:',
         )
 
     # ------------------------------------------------------------------

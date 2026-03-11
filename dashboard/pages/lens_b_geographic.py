@@ -160,7 +160,9 @@ def page():
             {base_where}
             AND a.position = 'first'
             AND a.institution_country IS NOT NULL
+            AND a.institution_country != ''
             AND w.study_country IS NOT NULL
+            AND w.study_country != ''
             AND w.study_country != 'GLOBAL'
             AND w.study_country NOT LIKE '%|%'
             AND w.study_country != 'UNKNOWN'
@@ -175,6 +177,10 @@ def page():
             df_flow.groupby('author_country')['n'].sum()
             .add(df_flow.groupby('study_country')['n'].sum(), fill_value=0)
         )
+        # Remove any blank/empty entries before selecting top countries
+        all_countries = all_countries[
+            all_countries.index.map(lambda x: bool(x and x.strip()))
+        ]
         top_countries = list(all_countries.nlargest(15).index)
 
         flow_filtered = df_flow[
@@ -193,7 +199,8 @@ def page():
 
             # Ensure both axes have the same countries in the same order
             country_names = sorted(
-                [iso2_to_country_name(c) for c in top_countries]
+                [n for n in (iso2_to_country_name(c) for c in top_countries)
+                 if n and n.strip()]
             )
             pivot = pivot.reindex(index=country_names, columns=country_names,
                                   fill_value=0)
@@ -276,6 +283,8 @@ def page():
                         AND w.study_country = ?
                         AND a.position = 'first'
                         AND a.institution_country IS NOT NULL
+                        AND a.institution_country != ''
+                        AND a.institution_country != 'UNKNOWN'
                         AND a.institution_country != ?
                         GROUP BY a.institution_country
                         ORDER BY n DESC LIMIT 10""",

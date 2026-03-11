@@ -233,6 +233,7 @@ def page():
                     {base_where}
                     AND a1.institution_name = ?
                     AND a2.institution_name IS NOT NULL
+                    AND a2.institution_name != ''
                     AND a2.institution_name != ?
                     GROUP BY a2.institution_name
                     ORDER BY n DESC LIMIT 10""",
