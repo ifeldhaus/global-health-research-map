@@ -138,6 +138,15 @@ def page():
         min_method_count = min(10, max(2, int(grand_total * 0.005)))
         keep_methods = col_sums[col_sums >= min_method_count].index
         z_filtered = z_df[keep_methods]
+
+        # Sort topics (rows) by the most negative z-score (biggest gap first)
+        topic_min_z = z_filtered.min(axis=1).sort_values()
+        z_filtered = z_filtered.loc[topic_min_z.index]
+
+        # Sort methods (columns) by overall frequency (most common first)
+        method_order = col_sums[keep_methods].sort_values(ascending=False).index
+        z_filtered = z_filtered[method_order]
+
         z_filtered_display = z_filtered.copy()
         z_filtered_display.index = [
             TOPIC_LABELS.get(c, c) for c in z_filtered_display.index
@@ -145,6 +154,10 @@ def page():
         z_filtered_display.columns = [
             METHOD_LABELS.get(m, m) for m in z_filtered_display.columns
         ]
+
+        # Build text annotations showing rounded z-scores
+        z_text = z_filtered_display.values.round(1).astype(str)
+        z_text = np.where(z_filtered_display.values == 0.0, '', z_text)
 
         fig = px.imshow(
             z_filtered_display.values,
@@ -155,12 +168,55 @@ def page():
             zmin=-4, zmax=4,
             labels={'color': 'Z-Score'},
             template=CHART_TEMPLATE,
+            text_auto=False,
+        )
+        fig.update_traces(
+            text=z_text,
+            texttemplate='%{text}',
+            textfont=dict(size=9),
         )
         fig.update_layout(
-            height=max(500, len(z_filtered_display) * 45),
+            height=max(500, len(z_filtered_display) * 50),
             xaxis_tickangle=-45,
+            margin=dict(l=20, r=20, t=30, b=100),
         )
         st.plotly_chart(fig, use_container_width=True)
+
+        st.info(
+            '**How to read this heatmap:** Each cell shows a z-score '
+            'measuring how much a topic\u2013method combination deviates from '
+            'the count expected under statistical independence. '
+            '**Blue cells** (negative z-scores) are under-represented '
+            'gaps \u2014 fewer papers than expected use that method for that '
+            'topic. **Red cells** (positive z-scores) are over-represented '
+            '\u2014 more papers than expected. Rows are sorted so the topic '
+            'with the largest gap appears at the top; columns are sorted '
+            'by overall method frequency (most common on the left). '
+            'Look for deep blue cells: these are the most promising '
+            'opportunities for new research using an under-utilized '
+            'method on an important topic.',
+            icon=':material/info:',
+        )
+
+        # Ranked summary of top 5 gaps
+        gap_list = []
+        for cat_code in z_filtered.index:
+            for method_code in z_filtered.columns:
+                z_val = z_filtered.loc[cat_code, method_code]
+                if z_val < -1.5:
+                    gap_list.append((
+                        TOPIC_LABELS.get(cat_code, cat_code),
+                        METHOD_LABELS.get(method_code, method_code),
+                        z_val,
+                    ))
+        gap_list.sort(key=lambda x: x[2])
+        if gap_list:
+            st.markdown('**Top methodological gaps:**')
+            for topic_name, method_name, z_val in gap_list[:5]:
+                st.markdown(
+                    f'- **{topic_name}** \u00d7 {method_name}: '
+                    f'z = {z_val:.1f}'
+                )
 
         # ------------------------------------------------------------------
         # Gap narrative drill-down
@@ -273,6 +329,22 @@ def page():
                 'impact_score', ascending=False
             ).head(20)
 
+            st.info(
+                '**How to read this scorecard:** Each row is a '
+                'topic\u2013method combination where the observed paper count '
+                'is significantly below what would be expected. '
+                '**Z-Score** measures the size of the gap in standard '
+                'deviations (more negative = bigger gap). '
+                '**Observed** vs **Expected** shows the actual paper count '
+                'versus what statistical independence predicts. '
+                '**Impact Score** = |z-score| \u00d7 log(topic volume) \u2014 '
+                'it prioritizes gaps that are both large (extreme z-score) '
+                'and in high-volume topics (where a new study would reach '
+                'a bigger evidence base). Higher impact scores indicate '
+                'the most promising opportunities for new research.',
+                icon=':material/info:',
+            )
+
             st.dataframe(
                 df_gaps[['topic', 'method', 'observed', 'expected',
                          'z_score', 'topic_volume', 'impact_score']].rename(
@@ -310,7 +382,8 @@ def page():
     df_countries = query_df(
         f"""SELECT study_country AS country, COUNT(*) AS n
             FROM works w {base_where}
-            AND study_country IS NOT NULL AND study_country != 'GLOBAL'
+            AND study_country IS NOT NULL
+            AND study_country NOT IN ('GLOBAL', 'UNKNOWN')
             AND method_type IS NOT NULL
             GROUP BY study_country ORDER BY n DESC LIMIT 30""",
         tuple(params),
