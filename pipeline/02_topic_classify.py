@@ -1,8 +1,9 @@
 """
 pipeline/02_topic_classify.py
 
-Classifies all works in the corpus into the topic taxonomy using
-claude-haiku-4-5. Async, resumable, writes to DuckDB after every chunk.
+Classifies all works in the corpus into the topic taxonomy using the
+Anthropic API (claude-haiku-4-5 by default; override with CLASSIFIER_MODEL).
+Async, resumable, writes to DuckDB after every chunk.
 
 Usage:
     uv run python pipeline/02_topic_classify.py          # full run
@@ -15,29 +16,50 @@ Run overnight (in parallel with 03_methods_classify.py):
 """
 
 import argparse
-import asyncio
 import csv
 import os
 import random
 import re
 import sys
 
-import anthropic
 import duckdb
-from dotenv import load_dotenv
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from pipeline.utils import pipeline_complete, truncate_abstract  # noqa: E402
+from pipeline.llm_classify import (  # noqa: E402
+    JUNK_ABSTRACT_PATTERNS,
+    MIN_ABSTRACT_LENGTH,
+    get_model,
+    mode_label,
+    run_classification,
+)
+from pipeline.utils import pipeline_complete  # noqa: E402
+
+from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
 DB           = 'data/global_health.duckdb'
 TAXONOMY_CSV = 'data/taxonomy/topic_taxonomy.csv'
-MODEL        = 'claude-haiku-4-5'
 CHUNK_SIZE   = 10   # concurrent requests; conservative to avoid rate limits
 MAX_TOKENS   = 20   # label only: "A|A04|high" is ~12 chars
-MOCK         = False # set via --mock flag; bypasses API calls
+
+
+# ---------------------------------------------------------------------------
+# Taxonomy
+# ---------------------------------------------------------------------------
+
+def load_taxonomy() -> list[dict]:
+    with open(TAXONOMY_CSV) as f:
+        return list(csv.DictReader(f))
+
+
+def valid_labels(rows: list[dict]) -> tuple[set[str], set[str]]:
+    """Return (valid category letters, valid subtopic ids) incl. Z sentinel."""
+    categories = {r['category_letter'] for r in rows} | {'Z'}
+    subtopics = {r['subtopic_id'] for r in rows} | {'Z00'}
+    # '<letter>00' fallbacks for category-only responses
+    subtopics |= {f'{c}00' for c in categories}
+    return categories, subtopics
 
 
 # ---------------------------------------------------------------------------
@@ -45,20 +67,29 @@ MOCK         = False # set via --mock flag; bypasses API calls
 # ---------------------------------------------------------------------------
 
 def build_system_prompt() -> str:
-    """Load taxonomy from CSV and build the classification system prompt."""
-    with open(TAXONOMY_CSV) as f:
-        rows = list(csv.DictReader(f))
+    """Build the classification prompt with the taxonomy grouped by category,
+    so the model sees what each category letter means."""
+    rows = load_taxonomy()
 
     lines = []
+    current_letter = None
     for r in rows:
-        lines.append(
-            f"{r['subtopic_id']} — {r['subtopic_name']} [{r['category_letter']}]"
-        )
+        if r['category_letter'] != current_letter:
+            current_letter = r['category_letter']
+            lines.append(f"\n{current_letter} — {r['category_name']}")
+        lines.append(f"  {r['subtopic_id']}  {r['subtopic_name']}")
     taxonomy_text = '\n'.join(lines)
 
     return f"""Classify global health research papers into the taxonomy below.
 You will receive the paper's title and abstract. Use BOTH to determine the topic;
 the title often contains key signals about the subject area.
+
+Rules:
+- Classify by the paper's PRIMARY research focus — the main subject the study
+  investigates, not the study setting or a secondary theme.
+- If a paper spans multiple topics, choose the one most central to the research
+  question, and use the subtopic list to decide between adjacent categories.
+- If the paper does not fit any subtopic, return: Z|Z00|low
 
 Return ONLY this format (no explanation, no preamble):
 <category_letter>|<subtopic_id>|<confidence>
@@ -66,9 +97,7 @@ Return ONLY this format (no explanation, no preamble):
 Where confidence is: high, med, or low
 Example: A|A04|high
 
-If the paper does not fit any subtopic, return: Z|Z00|low
-
-Taxonomy:
+Taxonomy (15 categories, letter — category name, then subtopics):
 {taxonomy_text}"""
 
 
@@ -78,10 +107,8 @@ Taxonomy:
 
 def _load_taxonomy_keywords() -> list[dict]:
     """Build keyword lists from taxonomy subtopic names for mock matching."""
-    with open(TAXONOMY_CSV) as f:
-        rows = list(csv.DictReader(f))
     entries = []
-    for r in rows:
+    for r in load_taxonomy():
         # Split subtopic name into searchable keywords, drop short words
         name = r['subtopic_name'].lower()
         # Remove parenthetical abbreviations to get real words
@@ -128,88 +155,8 @@ def mock_classify(title: str, abstract: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Async classification
-# ---------------------------------------------------------------------------
-
-client = anthropic.AsyncAnthropic()
-
-
-def _is_retryable(exc: BaseException) -> bool:
-    """Only retry on transient errors (rate-limit, server errors), not 400s."""
-    if isinstance(exc, anthropic.RateLimitError):
-        return True
-    if isinstance(exc, anthropic.APIStatusError) and exc.status_code >= 500:
-        return True
-    return False
-
-
-@retry(
-    wait=wait_exponential(min=1, max=60),
-    stop=stop_after_attempt(5),
-    retry=retry_if_exception(_is_retryable),
-)
-async def classify_one(openalex_id: str, title: str, abstract: str, system: str) -> tuple[str, str]:
-    """Returns (openalex_id, raw_label_string)."""
-    user_content = f"Title: {title}\n\nAbstract: {truncate_abstract(abstract)}"
-    msg = await client.messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        system=system,
-        messages=[{'role': 'user', 'content': user_content}],
-    )
-    return openalex_id, msg.content[0].text.strip()
-
-
-class BillingError(Exception):
-    """Raised when the API returns a billing/credits error."""
-    pass
-
-
-async def classify_batch(
-    batch: list[tuple[str, str, str]], system: str
-) -> list[tuple[str, str]]:
-    # Mock mode: skip API entirely, use keyword matching
-    if MOCK:
-        return [(oid, mock_classify(title, abstract)) for oid, title, abstract in batch]
-
-    tasks = [classify_one(oid, title, abstract, system) for oid, title, abstract in batch]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    # Check for billing errors first — if any task hit it, abort the
-    # entire batch without writing anything.
-    for r in results:
-        if isinstance(r, Exception):
-            err_msg = str(r).lower()
-            if 'credit balance' in err_msg or 'billing' in err_msg:
-                raise BillingError(
-                    'API credit balance too low. The script will stop now.\n'
-                    'Top up credits at https://console.anthropic.com/settings/billing\n'
-                    'then re-run this script — it will resume where it left off.'
-                )
-
-    # Only include successful results; skip failures so they remain
-    # unclassified and will be retried on the next run.
-    out = []
-    for i, r in enumerate(results):
-        if isinstance(r, Exception):
-            oid = batch[i][0]
-            print(f'  WARNING: skipping {oid} (will retry next run): {r}')
-        else:
-            out.append(r)
-    return out
-
-
-# ---------------------------------------------------------------------------
 # DB helpers
 # ---------------------------------------------------------------------------
-
-# Boilerplate patterns that appear in the abstract field but aren't real
-# abstracts (e.g. journal descriptions stored by OpenAlex).
-JUNK_ABSTRACT_PATTERNS = [
-    'Annals of Global Health is a peer-reviewed%',
-    'Welcome to Annals of Global Health%',
-]
-
 
 def load_unclassified(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str, str]]:
     junk_clauses = ' '.join(
@@ -220,11 +167,14 @@ def load_unclassified(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str, st
         FROM works
         WHERE classified_topic = FALSE
           AND abstract IS NOT NULL
-          AND LENGTH(abstract) > 50
+          AND LENGTH(abstract) > {MIN_ABSTRACT_LENGTH}
           {junk_clauses}
         ORDER BY publication_year DESC
     """).fetchall()
     return rows
+
+
+_VALID_CATEGORIES, _VALID_SUBTOPICS = valid_labels(load_taxonomy())
 
 
 def parse_label(raw: str) -> tuple[str, str, str]:
@@ -236,6 +186,9 @@ def parse_label(raw: str) -> tuple[str, str, str]:
     - 'A|A04|high\\n...'     → extra text after label (take first line)
     - 'A04|high'             → missing category letter (infer from subtopic)
     - 'A|high'               → missing subtopic (category + confidence only)
+
+    Any label not in the taxonomy is coerced: unknown subtopic falls back to
+    '<category>00'; unknown category falls back to Z|Z00.
     """
     # Take only the first line — model sometimes appends explanation
     first_line = raw.split('\n')[0].strip()
@@ -243,28 +196,31 @@ def parse_label(raw: str) -> tuple[str, str, str]:
 
     valid_conf = {'high', 'med', 'low'}
 
+    cat, sub, conf = None, None, 'low'
+
     if len(parts) >= 3:
         cat, sub, conf = parts[0], parts[1], parts[2]
         if conf not in valid_conf:
             conf = 'low'
-        # Standard: 'A|A04|high'
-        if len(cat) == 1 and cat.isalpha() and cat.isupper():
-            return cat, sub, conf
         # Model echoed subtopic as category: 'A04|A04|high'
         if len(cat) >= 2 and cat[0].isalpha() and cat[0].isupper():
-            return cat[0], sub, conf
+            cat = cat[0]
 
-    if len(parts) == 2:
+    elif len(parts) == 2:
         a, b = parts[0], parts[1]
         # Case: 'A04|high' — subtopic + confidence, missing category letter
         if len(a) >= 2 and a[0].isalpha() and a[0].isupper() and b in valid_conf:
-            return a[0], a, b
+            cat, sub, conf = a[0], a, b
         # Case: 'A|high' — category + confidence, missing subtopic
-        if len(a) == 1 and a.isalpha() and a.isupper() and b in valid_conf:
-            return a, f'{a}00', b
+        elif len(a) == 1 and a.isalpha() and a.isupper() and b in valid_conf:
+            cat, sub, conf = a, f'{a}00', b
 
-    # Malformed response — mark as unclassified
-    return 'Z', 'Z00', 'low'
+    # Validate against the taxonomy
+    if cat not in _VALID_CATEGORIES:
+        return 'Z', 'Z00', 'low'
+    if sub not in _VALID_SUBTOPICS:
+        sub = f'{cat}00'
+    return cat, sub, conf
 
 
 def write_results(
@@ -294,14 +250,12 @@ def write_results(
 # ---------------------------------------------------------------------------
 
 def main():
-    global MOCK
     parser = argparse.ArgumentParser()
     parser.add_argument('--test', action='store_true',
                         help='Classify only the first 100 unclassified records')
     parser.add_argument('--mock', action='store_true',
                         help='Use keyword-based mock classifier (no API calls)')
     args = parser.parse_args()
-    MOCK = args.mock
 
     con   = duckdb.connect(DB)
     rows  = load_unclassified(con)
@@ -309,39 +263,26 @@ def main():
     if args.test:
         rows = rows[:100]
 
-    mode_parts = []
-    if args.test:
-        mode_parts.append('TEST')
-    if MOCK:
-        mode_parts.append('MOCK')
-    mode_label = f' [{" + ".join(mode_parts)}]' if mode_parts else ''
-    print(f'Classifying {len(rows):,} unclassified works...{mode_label}')
+    print(f'Classifying {len(rows):,} unclassified works...'
+          f'{mode_label(args.test, args.mock)}')
+    if not args.mock:
+        print(f'  Model: {get_model()}')
 
     if not rows:
         print('Nothing to classify. All works already have topic labels.')
         con.close()
         return
 
-    system = build_system_prompt()
-    total  = 0
-
-    for i in range(0, len(rows), CHUNK_SIZE):
-        chunk = rows[i:i + CHUNK_SIZE]
-        try:
-            results = asyncio.run(classify_batch(chunk, system))
-        except BillingError as e:
-            print(f'\n✗ {e}')
-            print(f'  Progress saved: {total:,}/{len(rows):,} classified so far.')
-            con.close()
-            return
-        if results:
-            write_results(con, results)
-        total += len(results)
-        pct    = total / len(rows) * 100
-        print(f'  {total:,}/{len(rows):,} ({pct:.1f}%) classified')
+    completed = run_classification(
+        con, rows, build_system_prompt(), write_results,
+        max_tokens=MAX_TOKENS,
+        chunk_size=CHUNK_SIZE,
+        mock_fn=mock_classify if args.mock else None,
+    )
 
     con.close()
-    pipeline_complete('02_topic_classify')
+    if completed:
+        pipeline_complete('02_topic_classify')
 
 
 if __name__ == '__main__':

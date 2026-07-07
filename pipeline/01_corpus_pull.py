@@ -90,12 +90,28 @@ def fetch_page(issn: str, cursor: str = '*', test: bool = False) -> dict:
 # DB helpers
 # ---------------------------------------------------------------------------
 
-def already_fetched(con: duckdb.DuckDBPyConnection, issn: str) -> bool:
-    """Return True if we already have rows for this journal."""
-    n = con.execute(
+def db_count(con: duckdb.DuckDBPyConnection, issn: str) -> int:
+    """Number of works already stored for this journal."""
+    return con.execute(
         "SELECT COUNT(*) FROM works WHERE journal_issn = ?", [issn]
     ).fetchone()[0]
-    return n > 0
+
+
+def expected_count(issn: str) -> int:
+    """Total works OpenAlex reports for this journal/date filter."""
+    r = requests.get(
+        'https://api.openalex.org/works',
+        params={
+            'filter': f'primary_location.source.issn:{issn},publication_year:2010-2024',
+            'per-page': 1,
+            'select': 'id',
+        },
+        headers={'User-Agent': f'mailto:{EMAIL}'},
+        timeout=30,
+    )
+    r.raise_for_status()
+    time.sleep(RATE_SLEEP)
+    return r.json().get('meta', {}).get('count', 0)
 
 
 def insert_batch(con: duckdb.DuckDBPyConnection, rows: list[dict]):
@@ -210,11 +226,23 @@ def parse_work(work: dict, issn: str) -> dict:
 
 def pull_journal(issn: str, journal_name: str, con: duckdb.DuckDBPyConnection,
                  test: bool = False):
-    if already_fetched(con, issn):
-        print(f'  {journal_name} ({issn}): already in DB, skipping.')
-        return
-
-    print(f'  {journal_name} ({issn}): pulling...')
+    have = db_count(con, issn)
+    if have > 0:
+        if test:
+            print(f'  {journal_name} ({issn}): already in DB, skipping.')
+            return
+        # A journal can be partially pulled if a previous run was interrupted.
+        # Compare with the OpenAlex total; INSERT OR IGNORE makes re-pulling
+        # the overlap harmless.
+        expected = expected_count(issn)
+        if have >= expected:
+            print(f'  {journal_name} ({issn}): complete in DB '
+                  f'({have:,}/{expected:,}), skipping.')
+            return
+        print(f'  {journal_name} ({issn}): partial in DB '
+              f'({have:,}/{expected:,}), re-pulling...')
+    else:
+        print(f'  {journal_name} ({issn}): pulling...')
     cursor  = '*'
     page    = 0
     total   = 0

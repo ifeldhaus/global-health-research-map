@@ -32,8 +32,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from pipeline.utils import DB  # noqa: E402
 
 SAMPLE_PATH = Path('validation/validation_sample.csv')
+KEY_PATH = Path('validation/validation_sample_key.csv')
 LABELED_PATH = Path('validation/validation_sample_labeled.csv')
 TAXONOMY_DIR = Path('data/taxonomy')
+
+# Columns the labeler sees. LLM labels go to the key file only, so
+# hand-labeling is genuinely blind.
+BLIND_COLUMNS = ['openalex_id', 'title', 'abstract',
+                 'journal_issn', 'publication_year']
 
 
 # ---------------------------------------------------------------------------
@@ -250,10 +256,14 @@ def main():
     # Print summary
     print_summary(sample)
 
-    # Save
+    # Save: blind file for hand-labeling, key file with the LLM labels.
     SAMPLE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    sample.to_csv(SAMPLE_PATH, index=False)
-    print(f'\n  Sample saved to {SAMPLE_PATH}')
+    sample[BLIND_COLUMNS].to_csv(SAMPLE_PATH, index=False)
+    key_columns = ['openalex_id'] + [c for c in sample.columns
+                                     if c not in BLIND_COLUMNS]
+    sample[key_columns].to_csv(KEY_PATH, index=False)
+    print(f'\n  Blind sample saved to {SAMPLE_PATH}')
+    print(f'  LLM label key saved to {KEY_PATH} — do not open while labeling')
 
     # Instructions
     print(f"""
@@ -262,27 +272,24 @@ def main():
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║  1. Open {str(SAMPLE_PATH):<38s}   in Google Sheets  ║
+║     (it contains no LLM labels — labeling is blind)          ║
 ║                                                              ║
 ║  2. Add these columns after the existing ones:               ║
 ║     • human_topic_category  (your topic category, e.g. "A")  ║
 ║     • human_subtopic        (your subtopic, e.g. "A04")      ║
-║     • agree_topic           (1 = agree, 0 = disagree)        ║
 ║     • human_method          (your method, e.g. "M01")        ║
-║     • agree_method          (1 = agree, 0 = disagree)        ║
 ║                                                              ║
 ║  3. Label abstracts across 3 sessions:                       ║
 ║     • Session 1 (~4 hrs): abstracts 1–70                     ║
 ║     • Session 2 (~4 hrs): abstracts 71–140                   ║
 ║     • Session 3 (~4 hrs): abstracts 141–200                  ║
 ║                                                              ║
-║  4. Do NOT look at the LLM labels before making your own     ║
-║     judgment — blind labeling prevents bias.                  ║
-║                                                              ║
-║  5. Save the labeled file as:                                ║
+║  4. Save the labeled file as:                                ║
 ║     {str(LABELED_PATH):<52s}        ║
 ║                                                              ║
-║  6. Then run:                                                ║
+║  5. Then run:                                                ║
 ║     uv run python validation/02_kappa.py                     ║
+║     (it joins your labels to the LLM labels by openalex_id)  ║
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
 """)

@@ -1,8 +1,9 @@
 """
 pipeline/03_methods_classify.py
 
-Classifies all works in the corpus into the methods taxonomy using
-claude-haiku-4-5. Async, resumable, writes to DuckDB after every chunk.
+Classifies all works in the corpus into the methods taxonomy using the
+Anthropic API (claude-haiku-4-5 by default; override with CLASSIFIER_MODEL).
+Async, resumable, writes to DuckDB after every chunk.
 
 Usage:
     uv run python pipeline/03_methods_classify.py          # full run
@@ -15,29 +16,32 @@ Run overnight (in parallel with 02_topic_classify.py):
 """
 
 import argparse
-import asyncio
 import csv
 import os
 import random
 import re
 import sys
 
-import anthropic
 import duckdb
-from dotenv import load_dotenv
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from pipeline.utils import pipeline_complete, truncate_abstract  # noqa: E402
+from pipeline.llm_classify import (  # noqa: E402
+    JUNK_ABSTRACT_PATTERNS,
+    MIN_ABSTRACT_LENGTH,
+    get_model,
+    mode_label,
+    run_classification,
+)
+from pipeline.utils import pipeline_complete  # noqa: E402
+
+from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
 DB           = 'data/global_health.duckdb'
 TAXONOMY_CSV = 'data/taxonomy/methods_taxonomy.csv'
-MODEL        = 'claude-haiku-4-5'
 CHUNK_SIZE   = 10   # concurrent requests; conservative to avoid rate limits
 MAX_TOKENS   = 20   # label only: "M01|high" is ~10 chars
-MOCK         = False # set via --mock flag; bypasses API calls
 
 
 # ---------------------------------------------------------------------------
@@ -60,13 +64,24 @@ def build_system_prompt() -> str:
 You will receive the paper's title and abstract. Use BOTH to determine the method;
 the title often contains key signals (e.g. "a modelling study", "systematic review").
 
+Rules:
+- Classify by the paper's primary study design, not by secondary techniques
+  mentioned in passing.
+- Review types: a structured synthesis with a systematic search (with or without
+  meta-analysis) is M05; a scoping/mapping review following a scoping protocol
+  is M13; a review without a systematic search protocol is M14.
+- M04 vs M16: primary data collected from individual respondents at one time
+  point is M04; analyses of aggregate population-level rates, burden estimates,
+  or trends are M16.
+- Use M12 (Secondary Data Analysis) only when no more specific design applies
+  to the analysis — e.g. a cross-sectional analysis of DHS data is M04.
+- If the method cannot be determined, return: M18|low
+
 Return ONLY this format (no explanation, no preamble):
 <method_id>|<confidence>
 
 Where confidence is: high, med, or low
 Example: M01|high
-
-If the method cannot be determined, return: M18|low
 
 Taxonomy:
 {taxonomy_text}"""
@@ -128,86 +143,20 @@ def mock_classify(title: str, abstract: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Async classification
-# ---------------------------------------------------------------------------
-
-client = anthropic.AsyncAnthropic()
-
-
-def _is_retryable(exc: BaseException) -> bool:
-    """Only retry on transient errors (rate-limit, server errors), not 400s."""
-    if isinstance(exc, anthropic.RateLimitError):
-        return True
-    if isinstance(exc, anthropic.APIStatusError) and exc.status_code >= 500:
-        return True
-    return False
-
-
-@retry(
-    wait=wait_exponential(min=1, max=60),
-    stop=stop_after_attempt(5),
-    retry=retry_if_exception(_is_retryable),
-)
-async def classify_one(openalex_id: str, title: str, abstract: str, system: str) -> tuple[str, str]:
-    """Returns (openalex_id, raw_label_string)."""
-    user_content = f"Title: {title}\n\nAbstract: {truncate_abstract(abstract)}"
-    msg = await client.messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        system=system,
-        messages=[{'role': 'user', 'content': user_content}],
-    )
-    return openalex_id, msg.content[0].text.strip()
-
-
-class BillingError(Exception):
-    """Raised when the API returns a billing/credits error."""
-    pass
-
-
-async def classify_batch(
-    batch: list[tuple[str, str, str]], system: str
-) -> list[tuple[str, str]]:
-    # Mock mode: skip API entirely, use keyword matching
-    if MOCK:
-        return [(oid, mock_classify(title, abstract)) for oid, title, abstract in batch]
-
-    tasks = [classify_one(oid, title, abstract, system) for oid, title, abstract in batch]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    # Check for billing errors first — abort entire batch without writing.
-    for r in results:
-        if isinstance(r, Exception):
-            err_msg = str(r).lower()
-            if 'credit balance' in err_msg or 'billing' in err_msg:
-                raise BillingError(
-                    'API credit balance too low. The script will stop now.\n'
-                    'Top up credits at https://console.anthropic.com/settings/billing\n'
-                    'then re-run this script — it will resume where it left off.'
-                )
-
-    # Only include successful results; failures remain unclassified
-    # and will be retried on the next run.
-    out = []
-    for i, r in enumerate(results):
-        if isinstance(r, Exception):
-            print(f'  WARNING: skipping {batch[i][0]} (will retry next run): {r}')
-        else:
-            out.append(r)
-    return out
-
-
-# ---------------------------------------------------------------------------
 # DB helpers
 # ---------------------------------------------------------------------------
 
 def load_unclassified(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str, str]]:
-    rows = con.execute("""
+    junk_clauses = ' '.join(
+        f"AND abstract NOT LIKE '{pat}'" for pat in JUNK_ABSTRACT_PATTERNS
+    )
+    rows = con.execute(f"""
         SELECT openalex_id, title, abstract
         FROM works
         WHERE classified_method = FALSE
           AND abstract IS NOT NULL
-          AND LENGTH(abstract) > 50
+          AND LENGTH(abstract) > {MIN_ABSTRACT_LENGTH}
+          {junk_clauses}
         ORDER BY publication_year DESC
     """).fetchall()
     return rows
@@ -277,14 +226,12 @@ def write_results(
 # ---------------------------------------------------------------------------
 
 def main():
-    global MOCK
     parser = argparse.ArgumentParser()
     parser.add_argument('--test', action='store_true',
                         help='Classify only the first 100 unclassified records')
     parser.add_argument('--mock', action='store_true',
                         help='Use keyword-based mock classifier (no API calls)')
     args = parser.parse_args()
-    MOCK = args.mock
 
     con   = duckdb.connect(DB)
     rows  = load_unclassified(con)
@@ -292,39 +239,26 @@ def main():
     if args.test:
         rows = rows[:100]
 
-    mode_parts = []
-    if args.test:
-        mode_parts.append('TEST')
-    if MOCK:
-        mode_parts.append('MOCK')
-    mode_label = f' [{" + ".join(mode_parts)}]' if mode_parts else ''
-    print(f'Classifying {len(rows):,} unclassified works (methods)...{mode_label}')
+    print(f'Classifying {len(rows):,} unclassified works (methods)...'
+          f'{mode_label(args.test, args.mock)}')
+    if not args.mock:
+        print(f'  Model: {get_model()}')
 
     if not rows:
         print('Nothing to classify. All works already have method labels.')
         con.close()
         return
 
-    system = build_system_prompt()
-    total  = 0
-
-    for i in range(0, len(rows), CHUNK_SIZE):
-        chunk = rows[i:i + CHUNK_SIZE]
-        try:
-            results = asyncio.run(classify_batch(chunk, system))
-        except BillingError as e:
-            print(f'\n✗ {e}')
-            print(f'  Progress saved: {total:,}/{len(rows):,} classified so far.')
-            con.close()
-            return
-        if results:
-            write_results(con, results)
-        total += len(results)
-        pct    = total / len(rows) * 100
-        print(f'  {total:,}/{len(rows):,} ({pct:.1f}%) classified')
+    completed = run_classification(
+        con, rows, build_system_prompt(), write_results,
+        max_tokens=MAX_TOKENS,
+        chunk_size=CHUNK_SIZE,
+        mock_fn=mock_classify if args.mock else None,
+    )
 
     con.close()
-    pipeline_complete('03_methods_classify')
+    if completed:
+        pipeline_complete('03_methods_classify')
 
 
 if __name__ == '__main__':

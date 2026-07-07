@@ -32,13 +32,54 @@ import seaborn as sns
 from sklearn.metrics import cohen_kappa_score, confusion_matrix
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from pipeline.utils import notify  # noqa: E402
+from pipeline.utils import DB, notify  # noqa: E402
+
+import duckdb  # noqa: E402
 
 SAMPLE_PATH = Path('validation/validation_sample.csv')
 LABELED_PATH = Path('validation/validation_sample_labeled.csv')
 CONFUSION_DIR = Path('validation/confusion_matrices')
 REPORT_PATH = Path('validation/VALIDATION_REPORT.md')
 TAXONOMY_DIR = Path('data/taxonomy')
+
+# LLM label columns, joined from the database (or already present in a
+# legacy labeled CSV that froze them at sampling time).
+LLM_COLUMNS = ['topic_category', 'topic_subtopic', 'topic_confidence',
+               'method_type', 'method_confidence']
+
+
+def attach_llm_labels(df: pd.DataFrame, from_db: bool = False) -> pd.DataFrame:
+    """Ensure the dataframe has current LLM label columns.
+
+    If the CSV already carries LLM columns (legacy format) and from_db is
+    False, they are kept as-is. With from_db=True — or when the columns are
+    absent (blind sample format) — labels are joined from the database by
+    openalex_id, so hand labels can be re-scored after re-classification.
+    """
+    have_all = all(c in df.columns for c in LLM_COLUMNS)
+    if have_all and not from_db:
+        return df
+
+    source = 'refreshing from DB' if have_all else 'joining from DB'
+    print(f'  LLM labels: {source} ({DB})')
+
+    con = duckdb.connect(DB, read_only=True)
+    con.register('sample_ids', df[['openalex_id']])
+    llm = con.execute(f"""
+        SELECT openalex_id, {', '.join(LLM_COLUMNS)}
+        FROM works
+        WHERE openalex_id IN (SELECT openalex_id FROM sample_ids)
+    """).fetchdf()
+    con.close()
+
+    df = df.drop(columns=[c for c in LLM_COLUMNS if c in df.columns])
+    merged = df.merge(llm, on='openalex_id', how='left')
+
+    unmatched = merged['topic_category'].isna().sum()
+    if unmatched:
+        print(f'  WARNING: {unmatched} sampled papers not found in DB '
+              '(or unclassified) — they are excluded from kappa.')
+    return merged
 
 
 # ---------------------------------------------------------------------------
@@ -475,6 +516,12 @@ def main():
         '--test', action='store_true',
         help='Test mode: generate mock human labels with ~20%% disagreement',
     )
+    parser.add_argument(
+        '--from-db', action='store_true',
+        help='Score human labels against the CURRENT database labels instead '
+             'of any LLM columns frozen in the CSV. Use after re-running '
+             'classification (e.g. with a revised prompt or model).',
+    )
     args = parser.parse_args()
 
     plt.style.use('seaborn-v0_8-whitegrid')
@@ -490,6 +537,7 @@ def main():
             sys.exit(1)
 
         df = pd.read_csv(SAMPLE_PATH)
+        df = attach_llm_labels(df, from_db=args.from_db)
         df = generate_mock_labels(df)
         # Save labeled version for reference
         LABELED_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -503,6 +551,7 @@ def main():
             sys.exit(1)
 
         df = pd.read_csv(LABELED_PATH)
+        df = attach_llm_labels(df, from_db=args.from_db)
 
     # Validate required columns
     required = ['human_topic_category', 'human_method', 'topic_category', 'method_type']

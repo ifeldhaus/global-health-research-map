@@ -2,7 +2,8 @@
 pipeline/06_study_country.py
 
 Extracts the study country (where the research was conducted or focuses on)
-from each paper's title and abstract using claude-haiku-4-5.
+from each paper's title and abstract using the Anthropic API
+(claude-haiku-4-5 by default; override with CLASSIFIER_MODEL).
 Async, resumable, writes to DuckDB after every chunk.
 
 Usage:
@@ -16,26 +17,29 @@ Run overnight:
 """
 
 import argparse
-import asyncio
 import os
 import re
 import sys
 
-import anthropic
 import duckdb
-from dotenv import load_dotenv
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from pipeline.utils import pipeline_complete, truncate_abstract  # noqa: E402
+from pipeline.llm_classify import (  # noqa: E402
+    JUNK_ABSTRACT_PATTERNS,
+    MIN_ABSTRACT_LENGTH,
+    get_model,
+    mode_label,
+    run_classification,
+)
+from pipeline.utils import pipeline_complete  # noqa: E402
+
+from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
 DB         = 'data/global_health.duckdb'
-MODEL      = 'claude-haiku-4-5'
 CHUNK_SIZE = 10   # concurrent requests; conservative to avoid rate limits
 MAX_TOKENS = 40   # e.g. "KE,TZ,UG,MW,ZM|high" is ~25 chars
-MOCK       = False
 
 
 # ---------------------------------------------------------------------------
@@ -130,8 +134,10 @@ CODES|CONFIDENCE
 Rules:
 - Use ISO 3166-1 alpha-2 country codes (e.g., KE for Kenya, IN for India, BR for Brazil)
 - For multi-country studies, separate codes with commas: KE,TZ,UG|high
+- For studies naming more than 6 countries: GLOBAL|high
 - For studies spanning an entire WHO region or continent without naming specific countries: GLOBAL|med
 - For systematic reviews or meta-analyses covering many countries worldwide: GLOBAL|high
+- Do NOT infer the study country from author names or institutional affiliations
 - If no country can be determined from the title and abstract: UNKNOWN|low
 
 Where confidence is: high, med, or low
@@ -180,7 +186,9 @@ def mock_classify(title: str, abstract: str) -> str:
     found: list[str] = []
 
     for entry in _MOCK_COUNTRIES:
-        if entry['keyword'] in text and entry['code'] not in found:
+        # Word-boundary match so 'niger' doesn't fire inside 'nigeria'
+        if (re.search(rf"\b{re.escape(entry['keyword'])}\b", text)
+                and entry['code'] not in found):
             found.append(entry['code'])
 
     if not found:
@@ -193,93 +201,20 @@ def mock_classify(title: str, abstract: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Async classification
-# ---------------------------------------------------------------------------
-
-client = anthropic.AsyncAnthropic()
-
-
-def _is_retryable(exc: BaseException) -> bool:
-    """Only retry on transient errors (rate-limit, server errors), not 400s."""
-    if isinstance(exc, anthropic.RateLimitError):
-        return True
-    if isinstance(exc, anthropic.APIStatusError) and exc.status_code >= 500:
-        return True
-    return False
-
-
-@retry(
-    wait=wait_exponential(min=1, max=60),
-    stop=stop_after_attempt(5),
-    retry=retry_if_exception(_is_retryable),
-)
-async def classify_one(
-    openalex_id: str, title: str, abstract: str, system: str,
-) -> tuple[str, str]:
-    """Returns (openalex_id, raw_label_string)."""
-    user_content = f'Title: {title}\n\nAbstract: {truncate_abstract(abstract)}'
-    msg = await client.messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        system=system,
-        messages=[{'role': 'user', 'content': user_content}],
-    )
-    return openalex_id, msg.content[0].text.strip()
-
-
-class BillingError(Exception):
-    """Raised when the API returns a billing/credits error."""
-    pass
-
-
-async def classify_batch(
-    batch: list[tuple[str, str, str]], system: str,
-) -> list[tuple[str, str]]:
-    if MOCK:
-        return [
-            (oid, mock_classify(title, abstract))
-            for oid, title, abstract in batch
-        ]
-
-    tasks = [
-        classify_one(oid, title, abstract, system)
-        for oid, title, abstract in batch
-    ]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    # Check for billing errors first — abort entire batch without writing.
-    for r in results:
-        if isinstance(r, Exception):
-            err_msg = str(r).lower()
-            if 'credit balance' in err_msg or 'billing' in err_msg:
-                raise BillingError(
-                    'API credit balance too low. The script will stop now.\n'
-                    'Top up credits at https://console.anthropic.com/settings/billing\n'
-                    'then re-run this script — it will resume where it left off.'
-                )
-
-    # Only include successful results; failures remain unclassified
-    # and will be retried on the next run.
-    out = []
-    for i, r in enumerate(results):
-        if isinstance(r, Exception):
-            print(f'  WARNING: skipping {batch[i][0]} (will retry next run): {r}')
-        else:
-            out.append(r)
-    return out
-
-
-# ---------------------------------------------------------------------------
 # DB helpers
 # ---------------------------------------------------------------------------
 
 def load_unclassified(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str, str]]:
-    rows = con.execute("""
+    junk_clauses = ' '.join(
+        f"AND abstract NOT LIKE '{pat}'" for pat in JUNK_ABSTRACT_PATTERNS
+    )
+    rows = con.execute(f"""
         SELECT openalex_id, title, abstract
         FROM works
         WHERE classified_country = FALSE
           AND abstract IS NOT NULL
-          AND LENGTH(abstract) > 50
+          AND LENGTH(abstract) > {MIN_ABSTRACT_LENGTH}
+          {junk_clauses}
         ORDER BY publication_year DESC
     """).fetchall()
     return rows
@@ -367,14 +302,12 @@ def write_results(
 # ---------------------------------------------------------------------------
 
 def main():
-    global MOCK
     parser = argparse.ArgumentParser()
     parser.add_argument('--test', action='store_true',
                         help='Classify only the first 100 unclassified records')
     parser.add_argument('--mock', action='store_true',
                         help='Use keyword-based mock classifier (no API calls)')
     args = parser.parse_args()
-    MOCK = args.mock
 
     con = duckdb.connect(DB)
 
@@ -390,36 +323,26 @@ def main():
     if args.test:
         rows = rows[:100]
 
-    mode_parts = []
-    if args.test:
-        mode_parts.append('TEST')
-    if MOCK:
-        mode_parts.append('MOCK')
-    mode_label = f' [{" + ".join(mode_parts)}]' if mode_parts else ''
-    print(f'Classifying {len(rows):,} works (study country)...{mode_label}')
+    print(f'Classifying {len(rows):,} works (study country)...'
+          f'{mode_label(args.test, args.mock)}')
+    if not args.mock:
+        print(f'  Model: {get_model()}')
 
     if not rows:
         print('Nothing to classify. All works already have study country labels.')
         con.close()
         return
 
-    system = SYSTEM_PROMPT
-    total = 0
+    completed = run_classification(
+        con, rows, SYSTEM_PROMPT, write_results,
+        max_tokens=MAX_TOKENS,
+        chunk_size=CHUNK_SIZE,
+        mock_fn=mock_classify if args.mock else None,
+    )
 
-    for i in range(0, len(rows), CHUNK_SIZE):
-        chunk = rows[i:i + CHUNK_SIZE]
-        try:
-            results = asyncio.run(classify_batch(chunk, system))
-        except BillingError as e:
-            print(f'\n✗ {e}')
-            print(f'  Progress saved: {total:,}/{len(rows):,} classified so far.')
-            con.close()
-            return
-        if results:
-            write_results(con, results)
-        total += len(results)
-        pct = total / len(rows) * 100
-        print(f'  {total:,}/{len(rows):,} ({pct:.1f}%) classified')
+    if not completed:
+        con.close()
+        return
 
     # --- Verification summary -----------------------------------------------
     total_done = con.execute(

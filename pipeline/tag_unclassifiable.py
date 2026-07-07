@@ -22,20 +22,18 @@ Usage:
 """
 
 import argparse
+import os
+import sys
+
 import duckdb
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from pipeline.llm_classify import (  # noqa: E402
+    JUNK_ABSTRACT_PATTERNS as BOILERPLATE_PATTERNS,
+    MIN_ABSTRACT_LENGTH,
+)
+
 DB = 'data/global_health.duckdb'
-
-# Must match the threshold in 02_topic_classify.py and 03_methods_classify.py
-MIN_ABSTRACT_LENGTH = 50
-
-# Boilerplate patterns — journal descriptions stored by OpenAlex instead of
-# real abstracts.  Must stay in sync with JUNK_ABSTRACT_PATTERNS in
-# 02_topic_classify.py.
-BOILERPLATE_PATTERNS = [
-    "Annals of Global Health is a peer-reviewed%",
-    "Welcome to Annals of Global Health%",
-]
 
 
 def main():

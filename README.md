@@ -2,7 +2,7 @@
 
 **Power, Funding, and the Architecture of Scientific Knowledge**
 
-A computational analysis of ~100,000 papers published in core global health journals from 2010–2024, examining funder concentration, geographic equity, topic trends, and methodological gaps.
+A computational analysis of ~29,000 papers published in 11 core global health journals from 2010–2024, examining funder concentration, geographic equity, topic trends, and methodological gaps.
 
 **Isabelle Feldhaus — 2026**
 
@@ -36,8 +36,16 @@ cp .env.example .env
 # Initialize database
 uv run python pipeline/00_setup_db.py
 
-# Run corpus pull (overnight — 6–12 hrs)
+# Run corpus pull (~29,000 works; resumable if interrupted)
 caffeinate -i uv run python pipeline/01_corpus_pull.py
+
+# Classify (each script is resumable; --test for 100 records, --mock for no-API dry runs)
+caffeinate -i uv run python pipeline/02_topic_classify.py
+caffeinate -i uv run python pipeline/03_methods_classify.py
+caffeinate -i uv run python pipeline/06_study_country.py
+
+# Optional: use a stronger classification model for a given run
+CLASSIFIER_MODEL=claude-sonnet-5 uv run python pipeline/02_topic_classify.py
 ```
 
 ---
