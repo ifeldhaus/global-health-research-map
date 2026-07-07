@@ -46,14 +46,12 @@ caffeinate -i uv run python pipeline/01_corpus_pull.py
 
 ```
 pipeline/        # Numbered scripts: corpus pull → classification → enrichment
-analysis/        # Jupyter notebooks, one per research lens
-dashboard/       # Streamlit app
+dashboard/       # Streamlit app (7 pages: overview, four lenses, institutions, data completeness)
+notebooks/       # Analysis notebooks, one per research lens + institutions
 data/
   taxonomy/      # Topic and methods taxonomy CSVs
-  gbd/           # WHO Global Burden of Disease data
-notebooks/       # Exploratory notebooks
+  gbd/           # IHME Global Burden of Disease data (downloaded, not versioned)
 validation/      # Hand-labeled samples and kappa calculations
-prompts/         # LLM classification prompts, versioned
 docs/            # Methodology notes, known limitations
 ```
 
@@ -63,20 +61,21 @@ docs/            # Methodology notes, known limitations
 
 All papers published in the following journals, 2010–2024, retrieved via the [OpenAlex API](https://openalex.org):
 
-| Journal | ISSN |
-|---|---|
-| Lancet Global Health | 2214-109X |
-| BMJ Global Health | 2059-7908 |
-| PLOS Medicine | 1549-1277 |
-| Global Health Science and Practice | 2169-575X |
-| Globalization and Health | 1744-8603 |
-| International Journal of Epidemiology | 0300-5771 |
-| Bulletin of the World Health Organization | 0042-9686 |
-| Tropical Medicine & International Health | 1360-2276 |
-| American Journal of Tropical Medicine and Hygiene | 0002-9637 |
-| Health Policy and Planning | 0268-1080 |
+| Journal | ISSN | Coverage |
+|---|---|---|
+| Lancet Global Health | 2214-109X | 2013–2024 |
+| BMJ Global Health | 2059-7908 | 2016–2024 |
+| Global Health Science and Practice | 2169-575X | 2013–2024 |
+| Globalization and Health | 1744-8603 | 2010–2024 |
+| Bulletin of the World Health Organization | 0042-9686 | 2010–2024 |
+| Tropical Medicine & International Health | 1360-2276 | 2010–2024 |
+| Health Policy and Planning | 0268-1080 | 2010–2024 |
+| Journal of Global Health | 2047-2978 | 2011–2024 |
+| Global Public Health | 1744-1692 | 2010–2024 |
+| Annals of Global Health | 2214-9996 | 2014–2024 |
+| PLOS Global Public Health | 2767-3375 | 2021–2024 |
 
-A journal-based corpus was chosen over a topic-based approach for reproducibility and consistency. See `docs/methodology.md` for rationale.
+A journal-based corpus was chosen over a topic-based approach for reproducibility and consistency. Inclusion rationale per journal is in [`data/journal_list.csv`](data/journal_list.csv).
 
 ---
 
