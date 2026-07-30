@@ -11,7 +11,13 @@ import duckdb
 import pandas as pd
 import streamlit as st
 
-DB_PATH = Path(__file__).parent.parent / 'data' / 'global_health.duckdb'
+_DATA_DIR = Path(__file__).parent.parent / 'data'
+_FULL_DB = _DATA_DIR / 'global_health.duckdb'
+_SLIM_DB = _DATA_DIR / 'global_health_slim.duckdb'
+
+# Use the full database locally when present; fall back to the slim database
+# (the only one committed to the repo) for the public deployment.
+DB_PATH = _FULL_DB if _FULL_DB.exists() else _SLIM_DB
 
 
 def db_exists() -> bool:

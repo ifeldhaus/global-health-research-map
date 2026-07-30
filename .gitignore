@@ -6,6 +6,8 @@
 # Database
 *.duckdb
 *.duckdb.wal
+# Slim database is committed for the public Streamlit Community Cloud deploy
+!data/global_health_slim.duckdb
 
 # Large data files
 data/raw/*.jsonl
