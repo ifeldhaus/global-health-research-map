@@ -1,0 +1,206 @@
+% Methods section — draft for review.
+% Class-agnostic: standard \section/\subsection and \cite{} keys.
+% Citation keys are placeholders pending a .bib file:
+%   openalex, genderize, santamaria2018, gbd2023, worldbank2024,
+%   cohen1960, landis1977, duckdb, streamlit, anthropicclaude.
+
+\section{Methods}
+
+\subsection{Corpus}
+
+The corpus is the set of works indexed by OpenAlex~\cite{openalex} whose
+primary publication venue is one of eleven journals that publish global health
+research, with a publication year from 2010 through 2026. The eleven journals
+and their ISSNs are listed in Table~\ref{tab:journals}. The corpus was
+retrieved as a single snapshot in July 2026; 2026 is therefore a partial
+publication year, and per-year analyses either exclude it or mark it as
+incomplete. Citation counts and funding records reflect the state of OpenAlex
+at the snapshot date.
+
+A journal-defined boundary was used rather than a keyword or concept-tag
+search. Re-running the retrieval against the same journal list and date window
+returns the same corpus, apart from subsequent OpenAlex index updates. The
+boundary excludes global health research published in general medical journals;
+this is stated as a limitation. The retrieval returned 33{,}964 works.
+
+\subsection{Abstract availability}
+
+OpenAlex stores abstracts as inverted indexes, which were reconstructed to
+plain text at retrieval. Of the 33{,}964 works, 4{,}516 (13.3\%) lacked a
+usable abstract: 2{,}814 had no abstract, 1{,}592 carried journal boilerplate
+in place of an abstract, and 110 had an abstract of 50 characters or fewer.
+These works were labeled by the reason their abstract was unusable and were
+excluded from classification rather than treated as missing at random. The
+remaining 29{,}448 works (86.7\%) carry all three classification labels
+described below. Because the unusable-abstract works are concentrated in
+specific journals, the topic, methods, and study-country analyses are
+understood to under-represent those journals; analyses that do not depend on
+the abstract (publication counts, authorship, funding, institutions) use the
+full corpus.
+
+\subsection{Classification}
+
+Each work with a usable abstract was classified in three passes over its title
+and abstract (the abstract truncated to 300 words), using the large language
+model Claude Opus 4.8 (Anthropic). The three passes and their outputs were:
+
+\begin{itemize}
+  \item \textbf{Topic.} One of 15 primary categories (labeled A--O) and one of
+  143 subtopics, with a self-reported confidence level, and an optional
+  secondary category and subtopic (described below).
+  \item \textbf{Methods.} One of 18 study-design types (labeled M01--M18), with
+  a self-reported confidence level.
+  \item \textbf{Study country.} The country or countries in which the research
+  was conducted, as ISO 3166-1 alpha-2 codes (up to six, for multi-country
+  studies), or \texttt{GLOBAL} for region-wide or global work naming no
+  specific country, or \texttt{UNKNOWN}, with a self-reported confidence level.
+\end{itemize}
+
+The classification prompts were generated from the taxonomy definition files so
+that the taxonomy is the single source of each label set. Model responses were
+parsed and checked against the taxonomy; responses that were malformed or fell
+outside the taxonomy were assigned the uncategorized values
+(\texttt{Z} for topic, \texttt{M18} for methods, \texttt{UNKNOWN} for study
+country) rather than admitted as data. This produced 88{,}344 labels
+(29{,}448 works $\times$ 3 passes). Study country denotes the location of the
+study population or data collection, not author affiliation; the prompt
+instructed the model not to infer it from affiliations. Across the classified
+works, the uncategorized values were assigned to 5.2\% of topic labels, 3.8\%
+of methods labels, and 4.6\% of study-country labels; \texttt{GLOBAL} was
+assigned to 35.5\% of study-country labels, reflecting the corpus's share of
+systematic reviews, multi-country studies, and global-policy writing.
+
+The secondary topic category is a descriptive enrichment layer: works that
+address a co-equal second topic carry a second category and subtopic, covering
+approximately 21\% of the corpus. It is reported separately from the primary
+topic and is not used in the primary analyses.
+
+\subsection{Validation}
+
+Classification accuracy was assessed against 345 papers hand-labeled by a
+single human coder who did not see the model's labels, drawn from across the
+eleven journals (199 papers in a first round and 146 in a second; papers with
+no genuine abstract, such as front-matter and corrections, were skipped). The
+labels evaluated were the first-pass classifier output; no validation paper was
+used to develop the classifier, so all 345 papers are a held-out test set.
+Agreement was measured with Cohen's $\kappa$~\cite{cohen1960} and interpreted
+using the Landis and Koch descriptors~\cite{landis1977}. Agreement was
+substantial for the primary topic category ($\kappa = 0.66$; 69.3\% raw
+agreement) and for methods ($\kappa = 0.67$; 70.6\% agreement), moderate for
+the 143-way topic subtopic ($\kappa = 0.54$), and almost perfect for study
+country ($\kappa = 0.93$; 93.9\% exact-set agreement, computed on the primary
+country). Exact-set agreement for the topic labels including the optional
+secondary category was 0.54. These figures are reported in full in the
+repository's validation report.
+
+\subsection{Author gender}
+
+The likely gender of the first and last authors was inferred from their given
+names using the Genderize.io service~\cite{genderize}, following two
+adjustments recommended by Santamar\'ia and Mihaljevi\'c~\cite{santamaria2018}:
+diacritics were removed, and for compound given names the first component was
+used. Names returned below a probability of 0.6, single initials, and names for
+which no gender could be determined were recorded as unknown. The inference is
+probabilistic and binary and is less accurate for non-Western names; results
+are reported only at the level of the corpus, never for individual authors.
+
+\subsection{Funding}
+
+Funding was taken from the grant records that OpenAlex stores for each work.
+Each acknowledged funder was matched to a curated canonical funder list by its
+OpenAlex funder identifier, with name aliases as a fallback, so that variant
+names for the same funder were combined. The completeness of funder metadata
+varies over time and is weaker before 2015; it is therefore treated as a
+measured quantity rather than assumed complete, and unfunded rates are read as
+lower bounds.
+
+\subsection{Disease burden}
+
+Disease burden was taken from the Institute for Health Metrics and Evaluation
+Global Burden of Disease 2023 results~\cite{gbd2023}, using
+disability-adjusted life years and deaths (counts, all ages, both sexes). Each
+topic category was mapped to its corresponding GBD cause groups through a
+hand-built crosswalk. Comparisons of research attention to disease burden use
+the pooled World Bank low- and middle-income aggregate (the low, lower-middle,
+and upper-middle income groups combined), because the corpus concerns global
+health research directed largely at those settings. Burden values are fixed at
+the GBD 2023 release regardless of the corpus date window.
+
+\subsection{Analytic definitions and derived measures}
+
+\paragraph{Analytic subset.}
+Analyses of topics, methods, geography, funding, and institutions were
+restricted to research articles: works classified as narrative review (M14),
+commentary, editorial, or perspective (M15), or undeterminable design (M18)
+were excluded, as were works with an uncategorized topic (Z). The corpus
+overview reports all works, and a separate analysis profiles the commentary and
+editorial works on their own.
+
+\paragraph{Leadership.}
+An institution or country was credited with a work when one of its researchers
+was the first or last author, the positions that conventionally denote study
+leadership in health research. Middle-author positions were not counted toward
+leadership.
+
+\paragraph{Institution identity.}
+Institutions were identified by their OpenAlex institution identifier rather
+than by display name, because one display name (for example, ``Ministry of
+Health'') is shared by many distinct national bodies. Where a name was shared
+across multiple identifiers, the country was appended so that each national
+entity is counted separately.
+
+\paragraph{Income groups.}
+Institutions and study countries were grouped by the World Bank income
+classification for the 2024 fiscal year~\cite{worldbank2024}. Analyses
+contrast high-income with combined low- and middle-income countries; where
+noted, the four World Bank tiers (low, lower-middle, upper-middle, high income)
+are shown separately.
+
+\paragraph{Concentration.}
+Concentration of funding and of institutional production was summarized with
+the Gini coefficient and with the share held by the most productive decile and
+percentile.
+
+\paragraph{Research leadership by geography.}
+For research about a single country, leadership was classified from author
+affiliations relative to that country: local-led (the last author is affiliated
+with the study country), collaborative (an author, but not the last, is
+affiliated with the study country), or externally led, the last case
+corresponding to research conducted in a country with no author based there.
+Studies spanning multiple countries were excluded from this classification.
+
+\paragraph{Attention relative to burden.}
+For each topic, its share of publications was compared with its share of low-
+and middle-income disease burden. The two shares measure different quantities;
+their comparison is descriptive and is not interpreted as a causal or normative
+target.
+
+\paragraph{Evidence strength.}
+The 18 study-design types were grouped into three tiers for analysis:
+experimental and synthesis designs, observational and analytic designs, and
+descriptive and exploratory designs. The grouping is given in the taxonomy
+files.
+
+\paragraph{Citation influence.}
+Influence was measured with the OpenAlex cited-by count at the snapshot date.
+Because citations accumulate over time, recent works are cited less than older
+works of equal influence, and citation-based comparisons are read with that in
+mind.
+
+\paragraph{Collaboration.}
+Collaboration breadth was measured as the number of distinct partner
+institutions (by OpenAlex identifier) with which an institution shared
+authorship on at least one work.
+
+\subsection{Reproducibility and software}
+
+The retrieval, classification, enrichment, and validation steps are implemented
+as numbered scripts; the taxonomies, the canonical funder list, the disease
+burden crosswalk, the validation labels, and the agreement script are included
+in the repository, and the corpus is rebuildable from OpenAlex. Analyses were
+materialized into summary tables and are presented through an interactive
+dashboard covering the corpus overview, the funding, geographic, topic,
+methods, and institution analyses, and the abstract-availability report. Data
+were held and queried in DuckDB~\cite{duckdb}; the dashboard was built with
+Streamlit~\cite{streamlit}. The code, data, and dashboard are available at
+\url{https://github.com/ifeldhaus/global-health-research-map}.
