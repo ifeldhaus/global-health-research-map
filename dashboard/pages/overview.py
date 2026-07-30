@@ -27,7 +27,7 @@ def page():
     st.title('Overview')
     page_subtitle(
         'The corpus behind the analysis: global health research papers from '
-        '11 core journals, 2010 through July 2026 (2026 is a partial year).'
+        '11 global health journals, 2010 through July 2026 (2026 is a partial year).'
     )
 
     # ------------------------------------------------------------------
@@ -38,8 +38,8 @@ def page():
         st.markdown(
             '### Data Sources\n\n'
             'This dashboard draws on a bibliometric corpus of global health '
-            'research papers published between **2010 and July 2026** (2026 is a partial year) in **11 core '
-            'journals** selected for their prominence in global health:\n\n'
+            'research papers published between **2010 and July 2026** (2026 is a partial year) in **11 global '
+            'health journals** selected for their prominence in the field:\n\n'
             '- *Lancet Global Health*\n'
             '- *BMJ Global Health*\n'
             '- *PLOS Global Public Health*\n'

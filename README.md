@@ -1,8 +1,8 @@
 # Power and Priority in Global Health Research
 
-**Who leads it, who funds it, and what it studies, across 11 core journals, 2010–2026.**
+**Who leads it, who funds it, and what it studies, across 11 global health journals, 2010–2026.**
 
-A computational analysis of 33,964 papers (29,448 with classifiable abstracts) published in 11 core global health journals from 2010 through July 2026, examining who funds and produces the research, whose leadership it reflects, what it studies relative to disease burden, and which methods it uses.
+A computational analysis of 33,964 papers (29,448 with classifiable abstracts) published in 11 global health journals from 2010 through July 2026, examining who funds and produces the research, whose leadership it reflects, what it studies relative to disease burden, and which methods it uses.
 
 **Isabelle Feldhaus — 2026**
 
