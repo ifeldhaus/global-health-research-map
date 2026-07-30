@@ -6,7 +6,7 @@ A computational analysis of 33,964 papers (29,448 with classifiable abstracts) p
 
 **Isabelle Feldhaus — 2026**
 
-📊 [Dashboard](#dashboard) · 📄 Paper — *forthcoming* · 🗂 Preprint — *forthcoming*
+📊 [Live dashboard](https://global-health-research-map.streamlit.app) · 📄 Paper — *forthcoming* · 🗂 Preprint — *forthcoming*
 
 ---
 
@@ -66,12 +66,12 @@ analysis tables.
 uv run streamlit run dashboard/app.py
 ```
 
-**Live version:** deployment pending. The app reads a ~1.8 GB DuckDB analysis
-database that exceeds free static-hosting limits, so a public deploy needs the
-database either hosted externally (an object store the app downloads at startup)
-or slimmed to a hostable size; the full database is reproducible from the
-pipeline above. `requirements.txt` pins the dashboard's runtime dependencies for
-a Streamlit Community Cloud deploy.
+**Live version:** [global-health-research-map.streamlit.app](https://global-health-research-map.streamlit.app),
+deployed on Streamlit Community Cloud from this repo. The public app reads a
+~22 MB slim DuckDB build (`data/global_health_slim.duckdb`); `dashboard/db.py`
+uses the full ~1.9 GB database when it is present locally and falls back to the
+slim build otherwise. `requirements.txt` pins the runtime dependencies, and
+`deploy/README.md` documents the deploy and how to rebuild the slim database.
 
 ---
 
