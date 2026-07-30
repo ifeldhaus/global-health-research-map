@@ -22,6 +22,10 @@ __pycache__/
 # Agents (generated output, not versioned)
 agents/
 
+# Local tooling / intermediate artifacts (not versioned)
+.claude/
+data/labels_snapshot_pre_reclass.csv
+
 # Generated figures and docs
 docs/figures/
 docs/findings_draft.md
@@ -33,7 +37,11 @@ validation/validation_sample.csv
 validation/validation_sample_key.csv
 validation/validation_sample_labeled.csv
 validation/confusion_matrices/
-validation/VALIDATION_REPORT.md
+# Superseded validation tooling and backups, kept locally only
+validation/archive/
 
 # OS
 .DS_Store
+
+# Subscription classification batches (generated)
+batches/
