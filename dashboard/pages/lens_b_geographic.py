@@ -1,7 +1,7 @@
 """
 dashboard/pages/lens_b_geographic.py
 
-Lens B — Geographic Power: Is local research leadership genuinely growing?
+Lens B (Geographic Power): Is local research leadership genuinely growing?
 
 Analytical interactions:
 - Corridor deep-dive (click flow matrix cell → topic/funding breakdown)
@@ -16,10 +16,11 @@ import streamlit as st
 
 from dashboard.components import (
     check_data_ready, metric_row, section_header, download_csv_button,
+    page_subtitle,
 )
 from dashboard.constants import (
-    TOPIC_LABELS, NON_EMPIRICAL_METHODS, UNCATEGORIZED_TOPICS,
-    WHO_REGIONS, WHO_REGION_NAMES,
+    TOPIC_LABELS, TOPIC_COLORS, NON_EMPIRICAL_METHODS, UNCATEGORIZED_TOPICS,
+    WHO_REGIONS, WHO_REGION_NAMES, WHO_REGION_COLORS,
     CHART_TEMPLATE, CHART_HEIGHT, CHART_HEIGHT_TALL, iso2_to_country_name,
 )
 from dashboard.db import query_df, query_scalar, build_where_clause
@@ -27,15 +28,15 @@ from dashboard.db import query_df, query_scalar, build_where_clause
 
 def page():
     st.title('Geographic Power')
-    st.caption(
-        'Is local research leadership genuinely growing, or is '
-        '"parachute science" structurally persistent?'
+    page_subtitle(
+        'Where is global health research conducted, and who leads it: local '
+        'researchers or external "parachute science"? Is that changing over time?'
     )
 
     if not check_data_ready(require_countries=True):
         return
 
-    year_range = st.session_state.get('year_range', (2010, 2024))
+    year_range = st.session_state.get('year_range', (2010, 2025))
     topics = st.session_state.get('selected_topics', [])
     where, params = build_where_clause(year_range=year_range, topics=topics or None)
 
@@ -50,26 +51,84 @@ def page():
     params = params + list(NON_EMPIRICAL_METHODS) + list(UNCATEGORIZED_TOPICS)
 
     # ------------------------------------------------------------------
-    # Page controls
+    # Shared per-paper authorship geography (single-study-country papers).
+    # Reused by the summary band and the leadership/typology/region charts.
     # ------------------------------------------------------------------
-    col1, col2 = st.columns(2)
-    with col1:
-        parachute_def = st.radio(
-            'Parachute science definition',
-            ['No local first or last author (strict)',
-             'No local first author only (relaxed)'],
-            key='parachute_def',
-        )
-    strict = 'strict' in parachute_def
+    df_auth = query_df(
+        f"""WITH pa AS (
+                SELECT w.openalex_id,
+                       w.publication_year AS year,
+                       w.study_country AS study,
+                       MAX(CASE WHEN a.position = 'first'
+                           THEN a.institution_country END) AS first_c,
+                       MAX(CASE WHEN a.position = 'last'
+                           THEN a.institution_country END) AS last_c
+                FROM works w
+                JOIN authorships a ON w.openalex_id = a.openalex_id
+                {base_where}
+                  AND w.study_country IS NOT NULL
+                  AND w.study_country != 'GLOBAL'
+                  AND w.study_country NOT LIKE '%|%'
+                  AND w.study_country != 'UNKNOWN'
+                GROUP BY 1, 2, 3
+            )
+            SELECT * FROM pa
+            WHERE first_c IS NOT NULL AND first_c != '' AND first_c != 'UNKNOWN'""",
+        tuple(params),
+    )
 
     # ------------------------------------------------------------------
-    # Parachute science index over time
+    # Summary indicators of geographic power
+    # ------------------------------------------------------------------
+    if not df_auth.empty:
+        _tot = len(df_auth)
+        _local = (df_auth['first_c'] == df_auth['study']).mean() * 100
+        _para = (
+            (df_auth['first_c'] != df_auth['study'])
+            & (df_auth['last_c'] != df_auth['study'])
+        ).mean() * 100
+        _fa = df_auth['first_c'].value_counts()
+        _top_name = iso2_to_country_name(_fa.index[0])
+        _top_share = _fa.iloc[0] / _tot * 100
+        _n_study = df_auth['study'].nunique()
+        gc = st.columns(4)
+        gc[0].metric('Local-led rate', f'{_local:.0f}%',
+                     help='Share of papers whose first author is affiliated '
+                          'with the study country.')
+        gc[1].metric('Parachute rate', f'{_para:.0f}%',
+                     help='Share of papers with no local first or last author.')
+        gc[2].metric('Top author country', f'{_top_name}, {_top_share:.0f}%',
+                     help='Country holding the largest single share of '
+                          'first-authorships.')
+        gc[3].metric('Study countries', f'{_n_study:,}',
+                     help='Distinct countries that are the subject of research '
+                          'in the current filter.')
+        st.info(
+            'These indicators cover **single-study-country research papers**; '
+            'studies spanning several countries are excluded. "Local" versus '
+            '"parachute" is inferred from author affiliation relative to the '
+            'study country. It is a proxy for research leadership, not a '
+            'judgment of any individual collaboration.',
+            icon=':material/info:',
+        )
+
+    # ------------------------------------------------------------------
+    # Parachute rate over time
     # ------------------------------------------------------------------
     section_header(
-        'Parachute Science Index Over Time',
+        'Parachute Rate Over Time',
         'Proportion of papers where the study country has no local '
         'first (and/or last) author.',
     )
+
+    parachute_def = st.radio(
+        'Parachute science definition',
+        ['No local first or last author (strict)',
+         'No local first author only (relaxed)'],
+        key='parachute_def',
+        horizontal=True,
+    )
+    strict = 'strict' in parachute_def
 
     if strict:
         parachute_condition = """
@@ -128,16 +187,115 @@ def page():
         fig.add_trace(go.Scatter(
             x=df_parachute['year'], y=df_parachute['rate'],
             mode='lines+markers', name='Parachute rate',
-            line=dict(color='#d62728', width=2),
-            fill='tozeroy', fillcolor='rgba(214, 39, 40, 0.1)',
+            line=dict(color='#D55E00', width=2),
         ))
+        # Focused y-range so the rise-to-2016 and subsequent decline read
+        # clearly; the rate itself moves only within a ~45-60% band.
+        _lo = max(0, (df_parachute['rate'].min() // 5) * 5 - 5)
+        _hi = min(100, (df_parachute['rate'].max() // 5) * 5 + 10)
         fig.update_layout(
             template=CHART_TEMPLATE, height=CHART_HEIGHT,
             yaxis_title='Parachute Rate (%)',
             xaxis_title='Year',
+            yaxis=dict(range=[_lo, _hi]),
         )
         fig.update_xaxes(dtick=1)
         st.plotly_chart(fig, use_container_width=True)
+
+    st.info(
+        '**Parachute science** (also called *helicopter* or *parasitic* '
+        'research) is research conducted in a country, usually a low- or '
+        'middle-income one, by researchers based elsewhere, with little or no '
+        'leadership from local scientists. Here it is measured as papers about a '
+        'given study country in which **no author affiliated with that country '
+        'is a first author** (*relaxed*), or **a first or last author** '
+        '(*strict*). This is a proxy built from author affiliation and '
+        'authorship position, not a judgment of any individual collaboration.',
+        icon=':material/info:',
+    )
+
+    # ------------------------------------------------------------------
+    # C. Local leadership / collaboration / parachute, over time
+    # ------------------------------------------------------------------
+    section_header(
+        'Local Leadership, Collaboration, or Parachute',
+        'Every study-country paper split three ways by authorship, over time.',
+    )
+
+    if not df_auth.empty:
+        def _kind(r):
+            if r.first_c == r.study:
+                return 'Local-led'
+            if r.last_c == r.study:
+                return 'Collaborative (local last author)'
+            return 'Parachute (no local author)'
+
+        d = df_auth.copy()
+        d['kind'] = [_kind(r) for r in d.itertuples()]
+        comp = d.groupby(['year', 'kind']).size().reset_index(name='n')
+        comp['pct'] = comp['n'] / comp.groupby('year')['n'].transform('sum') * 100
+        kind_order = ['Local-led', 'Collaborative (local last author)',
+                      'Parachute (no local author)']
+        kind_colors = {
+            'Local-led': '#009E73',
+            'Collaborative (local last author)': '#0072B2',
+            'Parachute (no local author)': '#D55E00',
+        }
+        fig = px.area(
+            comp, x='year', y='pct', color='kind',
+            category_orders={'kind': kind_order},
+            color_discrete_map=kind_colors,
+            labels={'pct': 'Share of papers (%)', 'year': '', 'kind': ''},
+            template=CHART_TEMPLATE,
+        )
+        fig.update_layout(
+            height=CHART_HEIGHT, yaxis_range=[0, 100],
+            legend=dict(orientation='h', y=1.12, title_text=''),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption(
+            'Collaborative = the first author is external but the last (often '
+            'senior) author is local. Parachute = no local first or last '
+            'author. Separating these avoids counting genuine collaboration as '
+            'extraction.'
+        )
+
+    # ------------------------------------------------------------------
+    # D. Local leadership by region over time
+    # ------------------------------------------------------------------
+    section_header(
+        'Local Leadership by Region Over Time',
+        'Share of papers with a local first author, by the study country\'s '
+        'WHO region.',
+    )
+
+    if not df_auth.empty:
+        dr = df_auth.copy()
+        dr['region'] = dr['study'].map(WHO_REGIONS).map(WHO_REGION_NAMES)
+        dr = dr[dr['region'].notna()]
+        dr['local'] = (dr['first_c'] == dr['study']).astype(int)
+        reg = dr.groupby(['year', 'region']).agg(
+            local=('local', 'mean'), n=('local', 'size')).reset_index()
+        reg = reg[reg['n'] >= 15]  # suppress thin region-years
+        reg['pct'] = reg['local'] * 100
+        if not reg.empty:
+            fig = px.line(
+                reg, x='year', y='pct', color='region',
+                color_discrete_map=WHO_REGION_COLORS, markers=True,
+                labels={'pct': 'Local-led rate (%)', 'year': '',
+                        'region': 'WHO region'},
+                template=CHART_TEMPLATE,
+            )
+            fig.update_layout(
+                height=CHART_HEIGHT, yaxis_range=[0, 100],
+                legend=dict(font=dict(size=9), title_text=''),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            st.caption(
+                'Local-led rate = share of a region\'s study-country papers '
+                'with a first author from the study country. Region-years with '
+                'fewer than 15 papers are omitted.'
+            )
 
     # ------------------------------------------------------------------
     # Author country → Study country flow matrix
@@ -197,30 +355,105 @@ def page():
                 values='n', fill_value=0,
             )
 
-            # Ensure both axes have the same countries in the same order
-            country_names = sorted(
-                [n for n in (iso2_to_country_name(c) for c in top_countries)
-                 if n and n.strip()]
-            )
-            pivot = pivot.reindex(index=country_names, columns=country_names,
+            # Order both axes by total volume (author + study) descending so the
+            # highest-output countries cluster top-left and the block structure
+            # (who studies whom) reads coherently instead of alphabetically.
+            order_names = [
+                n for n in (iso2_to_country_name(c) for c in top_countries)
+                if n and n.strip()
+            ]
+            pivot = pivot.reindex(index=order_names, columns=order_names,
                                   fill_value=0)
+
+            # Saturate the color scale at the 95th-percentile OFF-DIAGONAL
+            # (cross-country) flow so the parachute cells span the full gradient.
+            # The large local-research diagonal is kept and simply reads as the
+            # top of the scale; cell text still shows the true counts.
+            _st = pivot.stack()
+            _off = _st[[i != j for i, j in _st.index]]
+            _off = _off[_off > 0]
+            zmax = float(_off.quantile(0.95)) if not _off.empty else 1.0
 
             fig = px.imshow(
                 pivot, text_auto=True,
                 labels={'x': 'Study Country', 'y': 'First Author Country',
                         'color': 'Papers'},
-                color_continuous_scale='Blues',
+                color_continuous_scale='YlOrRd',
+                zmin=0, zmax=zmax,
                 template=CHART_TEMPLATE,
                 aspect='equal',
             )
             fig.update_layout(
-                height=max(700, len(country_names) * 55),
+                height=max(700, len(order_names) * 55),
                 margin=dict(t=10),
             )
             st.plotly_chart(fig, use_container_width=True)
 
     # ------------------------------------------------------------------
-    # Country profile drill-down
+    # Parachute rate by topic
+    # ------------------------------------------------------------------
+    section_header(
+        'Parachute Rate by Topic',
+        'Which research areas have the most external authorship?',
+    )
+
+    df_para_topic = query_df(
+        f"""WITH paper_info AS (
+                SELECT w.openalex_id, w.topic_category, w.study_country,
+                       MAX(CASE WHEN a.position = 'first'
+                           THEN a.institution_country END) AS first_country,
+                       MAX(CASE WHEN a.position = 'last'
+                           THEN a.institution_country END) AS last_country
+                FROM works w
+                JOIN authorships a ON w.openalex_id = a.openalex_id
+                {base_where}
+                AND w.study_country IS NOT NULL AND w.study_country != 'GLOBAL'
+                AND w.topic_category IS NOT NULL
+                GROUP BY w.openalex_id, w.topic_category, w.study_country
+            )
+            SELECT topic_category AS cat,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN first_country IS NOT NULL
+                            AND first_country != study_country
+                       THEN 1 ELSE 0 END) AS parachute
+            FROM paper_info
+            WHERE first_country IS NOT NULL
+            GROUP BY topic_category""",
+        tuple(params),
+    )
+
+    if not df_para_topic.empty:
+        df_para_topic['rate'] = (
+            df_para_topic['parachute'] / df_para_topic['total'] * 100
+        ).round(1)
+        df_para_topic['label'] = df_para_topic['cat'].map(
+            lambda c: TOPIC_LABELS.get(c, c)
+        )
+        median_rate = df_para_topic['rate'].median()
+
+        fig = px.bar(
+            df_para_topic.sort_values('rate', ascending=True),
+            y='label', x='rate', orientation='h',
+            labels={'rate': 'Parachute Rate (%)', 'label': ''},
+            template=CHART_TEMPLATE,
+            color='cat', color_discrete_map=TOPIC_COLORS,
+        )
+        fig.add_vline(
+            x=median_rate, line_dash='dash', line_color='gray',
+            annotation_text=f'Median: {median_rate:.1f}%',
+        )
+        fig.update_layout(
+            height=max(400, len(df_para_topic) * 35),
+            showlegend=False,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        download_csv_button(
+            df_para_topic[['cat', 'label', 'total', 'parachute', 'rate']],
+            'parachute_by_topic.csv',
+        )
+
+    # ------------------------------------------------------------------
+    # Country profile drill-down (interactive, last)
     # ------------------------------------------------------------------
     section_header(
         'Country Profile',
@@ -267,6 +500,7 @@ def page():
                     )
                     fig = px.pie(
                         df_ctopic, values='n', names='label',
+                        color='cat', color_discrete_map=TOPIC_COLORS,
                         title=f'Research Topics in {selected_display}',
                         template=CHART_TEMPLATE,
                     )
@@ -298,72 +532,10 @@ def page():
                         labels={'n': 'Papers', 'name': ''},
                         template=CHART_TEMPLATE,
                     )
-                    fig.update_traces(marker_color='#ff7f0e')
+                    fig.update_traces(marker_color='#E69F00')
                     fig.update_layout(
                         height=400,
                         yaxis={'categoryorder': 'total ascending'},
                     )
                     st.plotly_chart(fig, use_container_width=True)
 
-    # ------------------------------------------------------------------
-    # Parachute index by topic
-    # ------------------------------------------------------------------
-    section_header(
-        'Parachute Rate by Topic',
-        'Which research areas have the most external authorship?',
-    )
-
-    df_para_topic = query_df(
-        f"""WITH paper_info AS (
-                SELECT w.openalex_id, w.topic_category, w.study_country,
-                       MAX(CASE WHEN a.position = 'first'
-                           THEN a.institution_country END) AS first_country,
-                       MAX(CASE WHEN a.position = 'last'
-                           THEN a.institution_country END) AS last_country
-                FROM works w
-                JOIN authorships a ON w.openalex_id = a.openalex_id
-                {base_where}
-                AND w.study_country IS NOT NULL AND w.study_country != 'GLOBAL'
-                AND w.topic_category IS NOT NULL
-                GROUP BY w.openalex_id, w.topic_category, w.study_country
-            )
-            SELECT topic_category AS cat,
-                   COUNT(*) AS total,
-                   SUM(CASE WHEN first_country IS NOT NULL
-                            AND first_country != study_country
-                       THEN 1 ELSE 0 END) AS parachute
-            FROM paper_info
-            WHERE first_country IS NOT NULL
-            GROUP BY topic_category""",
-        tuple(params),
-    )
-
-    if not df_para_topic.empty:
-        df_para_topic['rate'] = (
-            df_para_topic['parachute'] / df_para_topic['total'] * 100
-        ).round(1)
-        df_para_topic['label'] = df_para_topic['cat'].map(
-            lambda c: TOPIC_LABELS.get(c, c)
-        )
-        median_rate = df_para_topic['rate'].median()
-
-        fig = px.bar(
-            df_para_topic.sort_values('rate', ascending=True),
-            y='label', x='rate', orientation='h',
-            labels={'rate': 'Parachute Rate (%)', 'label': ''},
-            template=CHART_TEMPLATE,
-            color='rate', color_continuous_scale='RdYlGn_r',
-        )
-        fig.add_vline(
-            x=median_rate, line_dash='dash', line_color='gray',
-            annotation_text=f'Median: {median_rate:.1f}%',
-        )
-        fig.update_layout(
-            height=max(400, len(df_para_topic) * 35),
-            coloraxis_showscale=False,
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        download_csv_button(
-            df_para_topic[['cat', 'label', 'total', 'parachute', 'rate']],
-            'parachute_by_topic.csv',
-        )
