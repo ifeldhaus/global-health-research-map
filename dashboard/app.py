@@ -27,7 +27,7 @@ from dashboard.db import db_exists, get_pipeline_status
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
-    page_title='Global Health Research Map',
+    page_title='Power and Priority in Global Health Research',
     page_icon=':earth_americas:',
     layout='wide',
     initial_sidebar_state='expanded',
@@ -79,8 +79,8 @@ pg = st.navigation(pages)
 # ---------------------------------------------------------------------------
 
 with st.sidebar:
-    st.title(':earth_americas: Global Health Research Map')
-    st.caption('Mapping power, priority, and practice in global health research')
+    st.title(':earth_americas: Power and Priority in Global Health Research')
+    st.caption('Who leads it, who funds it, and what it studies, across 11 core journals, 2010–2026')
 
     st.divider()
 
@@ -89,9 +89,13 @@ with st.sidebar:
     year_range = st.slider(
         'Publication years',
         min_value=2010,
-        max_value=2024,
-        value=(2010, 2024),
+        max_value=2026,
+        value=(2010, 2025),
         key='year_range',
+    )
+    st.caption(
+        'Default ends at 2025; 2026 is a partial year (through the July 2026 '
+        'snapshot). Extend the slider to include it.'
     )
 
     # Topic category filter
@@ -123,9 +127,15 @@ with st.sidebar:
             pct = (classified / total * 100) if total > 0 else 0
             st.caption(f':white_check_mark: {total:,} papers loaded')
             if pct < 100:
-                st.caption(f':hourglass_flowing_sand: {pct:.0f}% enriched')
+                st.caption(
+                    f':bar_chart: {classified:,} of {total:,} classified ({pct:.0f}%)'
+                )
+                st.caption(
+                    'Remaining have no usable abstract (editorials, corrections, '
+                    'front-matter) and are not classified.'
+                )
             else:
-                st.caption(':white_check_mark: All enrichments complete')
+                st.caption(':white_check_mark: All papers classified')
         else:
             st.caption(':hourglass_flowing_sand: Awaiting corpus pull')
     else:
