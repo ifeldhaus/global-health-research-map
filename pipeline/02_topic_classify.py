@@ -85,17 +85,39 @@ You will receive the paper's title and abstract. Use BOTH to determine the topic
 the title often contains key signals about the subject area.
 
 Rules:
-- Classify by the paper's PRIMARY research focus — the main subject the study
-  investigates, not the study setting or a secondary theme.
-- If a paper spans multiple topics, choose the one most central to the research
-  question, and use the subtopic list to decide between adjacent categories.
-- If the paper does not fit any subtopic, return: Z|Z00|low
+- PRIMARY = the single most central topic — the main subject the study
+  investigates, not the study setting or a passing theme.
+- SECONDARY (optional, RARE): most papers have ONE clear topic — leave the
+  secondary empty. Add a secondary ONLY when the paper gives roughly EQUAL weight
+  to two genuinely distinct areas across BOTH its objectives and its findings
+  (expect this for at most ~1 in 4 papers). If you can name a single dominant
+  topic, use only the primary. A secondary is NOT for the study setting, the
+  population, a data source, or a theme mentioned in passing. When in doubt, omit
+  it. The secondary may share the primary's category with a DIFFERENT subtopic.
+- J vs I (financing vs system): if the core subject is FINANCING — funding,
+  expenditure, health insurance financing, economic growth, resource pooling,
+  development assistance, cost — the primary is J, even when set in a health
+  system or framed around UHC. Use I only when the core subject is the DELIVERY
+  SYSTEM itself: service delivery, governance, workforce, quality, or UHC as a
+  system of care.
+- Disease vs population: when a paper centers on a specific disease, pathogen, or
+  vaccine, the PRIMARY is the disease category (C infectious, D HIV/TB/malaria,
+  E NTD); use the population category (A maternal, B child) as a SECONDARY if that
+  life-stage is a substantial focus. Use A or B as PRIMARY only when the
+  life-stage/population itself — not a specific disease — is the focus.
+- Z: use Z only when NO substantive category fits — global-health governance,
+  diplomacy, geopolitics, decolonisation, or meta-commentary on the field itself.
+  Do not force these into I (Health Systems).
+- If the paper does not fit any subtopic, return Z|Z00 as the primary.
 
-Return ONLY this format (no explanation, no preamble):
-<category_letter>|<subtopic_id>|<confidence>
-
-Where confidence is: high, med, or low
-Example: A|A04|high
+Return ONLY this pipe-delimited format (no explanation, no preamble):
+<category>|<subtopic>|<confidence>|<secondary_category>|<secondary_subtopic>
+Use a single hyphen for BOTH secondary fields when there is no secondary.
+confidence is: high, med, or low
+Examples:
+  A|A04|high|-|-           (single topic)
+  D|D03|high|G|G02         (primary HIV, secondary mental health)
+  I|I01|med|I|I05          (same category, two distinct subtopics)
 
 Taxonomy (15 categories, letter — category name, then subtopics):
 {taxonomy_text}"""
@@ -177,60 +199,78 @@ def load_unclassified(con: duckdb.DuckDBPyConnection) -> list[tuple[str, str, st
 _VALID_CATEGORIES, _VALID_SUBTOPICS = valid_labels(load_taxonomy())
 
 
-def parse_label(raw: str) -> tuple[str, str, str]:
-    """Parse 'A|A04|high' → (category, subtopic, confidence).
+def _coerce_pair(cat, sub):
+    """Validate a (category, subtopic) pair against the taxonomy. Returns the
+    coerced pair, or None if the category is invalid/empty."""
+    if not cat or cat in ('-', 'NONE', 'None'):
+        return None
+    # Model echoed subtopic as category: 'A04' → 'A'
+    if len(cat) >= 2 and cat[0].isalpha() and cat[0].isupper():
+        cat = cat[0]
+    if cat not in _VALID_CATEGORIES:
+        return None
+    if not sub or sub not in _VALID_SUBTOPICS:
+        sub = f'{cat}00'
+    return cat, sub
 
-    Handles common model response variants:
-    - 'A|A04|high'           → standard 3-part format
-    - 'A04|A04|high'         → subtopic echoed as category (extract letter)
-    - 'A|A04|high\\n...'     → extra text after label (take first line)
-    - 'A04|high'             → missing category letter (infer from subtopic)
-    - 'A|high'               → missing subtopic (category + confidence only)
 
-    Any label not in the taxonomy is coerced: unknown subtopic falls back to
-    '<category>00'; unknown category falls back to Z|Z00.
+def parse_label(raw: str) -> tuple[str, str, str, str, str]:
+    """Parse the (multi-label) topic response.
+
+    Format: '<cat>|<sub>|<conf>[|<cat2>|<sub2>]'
+      'A|A04|high'            → single topic
+      'D|D03|high|G|G02'      → primary + secondary
+      'I|I01|med|I|I05'       → same category, two subtopics
+    Secondary fields of '-' / '' / 'NONE' mean no secondary.
+    Returns (category, subtopic, confidence, category_2, subtopic_2); the two
+    secondary fields are '' when absent. Robust to the same malformed variants
+    the single-label parser handled.
     """
-    # Take only the first line — model sometimes appends explanation
     first_line = raw.split('\n')[0].strip()
     parts = [p.strip() for p in first_line.split('|')]
-
     valid_conf = {'high', 'med', 'low'}
 
     cat, sub, conf = None, None, 'low'
-
     if len(parts) >= 3:
         cat, sub, conf = parts[0], parts[1], parts[2]
         if conf not in valid_conf:
             conf = 'low'
-        # Model echoed subtopic as category: 'A04|A04|high'
         if len(cat) >= 2 and cat[0].isalpha() and cat[0].isupper():
             cat = cat[0]
-
     elif len(parts) == 2:
         a, b = parts[0], parts[1]
-        # Case: 'A04|high' — subtopic + confidence, missing category letter
         if len(a) >= 2 and a[0].isalpha() and a[0].isupper() and b in valid_conf:
             cat, sub, conf = a[0], a, b
-        # Case: 'A|high' — category + confidence, missing subtopic
         elif len(a) == 1 and a.isalpha() and a.isupper() and b in valid_conf:
             cat, sub, conf = a, f'{a}00', b
 
-    # Validate against the taxonomy
-    if cat not in _VALID_CATEGORIES:
-        return 'Z', 'Z00', 'low'
-    if sub not in _VALID_SUBTOPICS:
-        sub = f'{cat}00'
-    return cat, sub, conf
+    primary = _coerce_pair(cat, sub) or ('Z', 'Z00')
+    cat, sub = primary
+
+    cat2, sub2 = '', ''
+    if len(parts) >= 5:
+        sec = _coerce_pair(parts[3], parts[4])
+        # ignore a secondary that duplicates the primary exactly
+        if sec and sec != (cat, sub):
+            cat2, sub2 = sec
+    return cat, sub, conf, cat2, sub2
 
 
 def write_results(
     con: duckdb.DuckDBPyConnection,
     results: list[tuple[str, str]],
 ):
+    cols = [r[1] for r in con.execute("PRAGMA table_info('works')").fetchall()]
+    if 'topic_category_2' not in cols:
+        con.execute("ALTER TABLE works ADD COLUMN topic_category_2 VARCHAR")
+    if 'topic_subtopic_2' not in cols:
+        con.execute("ALTER TABLE works ADD COLUMN topic_subtopic_2 VARCHAR")
+
     rows = []
     for openalex_id, raw in results:
-        category, subtopic, confidence = parse_label(raw)
-        rows.append((category, subtopic, confidence, openalex_id))
+        category, subtopic, confidence, cat2, sub2 = parse_label(raw)
+        rows.append((category, subtopic, confidence,
+                     cat2 or None, sub2 or None, openalex_id))
 
     con.executemany(
         """
@@ -238,6 +278,8 @@ def write_results(
         SET topic_category   = ?,
             topic_subtopic   = ?,
             topic_confidence = ?,
+            topic_category_2 = ?,
+            topic_subtopic_2 = ?,
             classified_topic = TRUE
         WHERE openalex_id = ?
         """,

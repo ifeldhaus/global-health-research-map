@@ -35,6 +35,10 @@ EMAIL   = os.getenv('OPENALEX_EMAIL', 'researcher@example.com')
 DB      = 'data/global_health.duckdb'
 JOURNAL_CSV = 'data/journal_list.csv'
 
+# Corpus window. 2026 is a partial year — the corpus is a snapshot as of the
+# pull date; per-year trend analyses should treat 2026 accordingly.
+YEAR_FILTER = 'publication_year:2010-2026'
+
 # OpenAlex polite pool: max 10 req/sec; 0.12 s gap keeps us safely under
 RATE_SLEEP  = 0.12
 PER_PAGE    = 200
@@ -67,7 +71,7 @@ def reconstruct_abstract(inv: dict | None) -> str:
 @retry(wait=wait_exponential(min=1, max=30), stop=stop_after_attempt(5))
 def fetch_page(issn: str, cursor: str = '*', test: bool = False) -> dict:
     params = {
-        'filter':   f'primary_location.source.issn:{issn},publication_year:2010-2024',
+        'filter':   f'primary_location.source.issn:{issn},{YEAR_FILTER}',
         'per-page': PER_PAGE,
         'cursor':   cursor,
         'select':   FIELDS,
@@ -102,7 +106,7 @@ def expected_count(issn: str) -> int:
     r = requests.get(
         'https://api.openalex.org/works',
         params={
-            'filter': f'primary_location.source.issn:{issn},publication_year:2010-2024',
+            'filter': f'primary_location.source.issn:{issn},{YEAR_FILTER}',
             'per-page': 1,
             'select': 'id',
         },

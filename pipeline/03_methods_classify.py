@@ -69,12 +69,39 @@ Rules:
   mentioned in passing.
 - Review types: a structured synthesis with a systematic search (with or without
   meta-analysis) is M05; a scoping/mapping review following a scoping protocol
-  is M13; a review without a systematic search protocol is M14.
-- M04 vs M16: primary data collected from individual respondents at one time
-  point is M04; analyses of aggregate population-level rates, burden estimates,
-  or trends are M16.
-- Use M12 (Secondary Data Analysis) only when no more specific design applies
-  to the analysis — e.g. a cross-sectional analysis of DHS data is M04.
+  is M13; a review without a systematic search protocol is M14. PROSPERO
+  registration or a PRISMA flow diagram → M05.
+- The M04 / M16 / M12 split uses a PROVENANCE GATE, then an output test:
+  STEP 1 — Did the authors COLLECT the data themselves (their own fieldwork,
+  survey, trial, or specimens)?
+    → Yes: classify by DESIGN — M01 RCT, M02 quasi-experimental, M03 cohort,
+      M04 cross-sectional survey, M06 qualitative, M17 case study, etc.
+      A primary cross-sectional survey the authors fielded is M04.
+  STEP 2 — Did they instead ANALYZE an EXISTING standardized dataset they did
+  not collect (DHS, SAGE, GBD, MICS, national/administrative survey, registry)?
+    → Descriptive quantity (prevalence, incidence, mortality, DALYs, burden,
+      coverage, or its distribution/trend) → M16. Example: global burden of a
+      disease from GBD → M16.
+    → Analytical relationship (determinants, associations, risk-factor models,
+      econometric/financing analysis, development assistance, cross-national
+      comparison) → M12. Example: mining DHS for determinants of unmet need,
+      or whether smaller countries get more aid per capita → M12.
+  So: fielding a survey → M04; mining DHS for relationships → M12; using DHS to
+  report prevalence/burden → M16. Two checks: (1) did they collect it?
+  (2) descriptive or analytical? Longitudinal follow-up of the same individuals
+  is M03 regardless of provenance.
+- M06 vs M09: a study applying a NAMED implementation-science framework
+  (e.g. RE-AIM, CFIR, NPT) to study uptake/scale-up is M09; qualitative or
+  mixed-methods work WITHOUT such a framework is M06.
+- M06 vs M15: if the paper reports its OWN qualitative data (interviews, focus
+  groups, ethnography), it is M06 — even if framed as a "perspective." M15 is
+  opinion/commentary/editorial with NO primary data.
+- M01 vs M02: randomized assignment is M01; a controlled but non-randomized
+  comparison (pre/post, difference-in-differences, interrupted time series) is M02.
+- M03 vs M04: follow-up of a defined population over time is M03; single
+  time-point measurement is M04.
+- M04 vs M18: a single-timepoint study that enrolls and measures a defined
+  sample is M04, not M18. Reserve M18 only when no design can be determined.
 - If the method cannot be determined, return: M18|low
 
 Return ONLY this format (no explanation, no preamble):

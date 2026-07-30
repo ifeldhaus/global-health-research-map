@@ -32,3 +32,28 @@ def truncate_abstract(text: str, max_words: int = 300) -> str:
     if len(words) <= max_words:
         return text
     return ' '.join(words[:max_words]) + '...'
+
+
+# Evidence-type grouping of the method taxonomy. Used to separate primary
+# research from opinion/discourse in the lens analyses. Commentary/editorial
+# (M15) alone is ~28% of the corpus and would distort "where research happens"
+# analyses if left in, so lenses A/B/D restrict to `empirical`.
+#   empirical      — primary studies (trials, observational, modelling, econ, etc.)
+#   synthesis      — rigorous secondary research (systematic & scoping reviews)
+#   non_empirical  — narrative reviews, commentary/editorial/perspective, other/unclear
+EVIDENCE_TYPE_MAP = {
+    'M01': 'empirical', 'M02': 'empirical', 'M03': 'empirical',
+    'M04': 'empirical', 'M06': 'empirical', 'M07': 'empirical',
+    'M08': 'empirical', 'M09': 'empirical', 'M10': 'empirical',
+    'M11': 'empirical', 'M12': 'empirical', 'M16': 'empirical',
+    'M17': 'empirical',
+    'M05': 'synthesis', 'M13': 'synthesis',
+    'M14': 'non_empirical', 'M15': 'non_empirical', 'M18': 'non_empirical',
+}
+
+
+def evidence_type(method_type):
+    """Map a method_type code to its evidence-type group (or None)."""
+    if method_type is None:
+        return None
+    return EVIDENCE_TYPE_MAP.get(method_type, 'non_empirical')
