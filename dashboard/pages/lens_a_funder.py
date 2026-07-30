@@ -45,7 +45,8 @@ def page():
 
     year_range = st.session_state.get('year_range', (2010, 2025))
     topics = st.session_state.get('selected_topics', [])
-    where, params = build_where_clause(year_range=year_range, topics=topics or None)
+    where, where_params = build_where_clause(
+        year_range=year_range, topics=topics or None)
     # Exclude uncategorized topics and non-empirical methods from analysis
     uc_placeholders = ', '.join(['?'] * len(UNCATEGORIZED_TOPICS))
     uc_clause = f" AND (w.topic_category IS NULL OR w.topic_category NOT IN ({uc_placeholders}))"
@@ -53,7 +54,28 @@ def page():
     ne_clause = (f" AND (w.method_type IS NULL "
                  f"OR w.method_type NOT IN ({ne_placeholders}))")
     base_where = f"WHERE TRUE {where}{uc_clause}{ne_clause}"
-    params = params + list(UNCATEGORIZED_TOPICS) + list(NON_EMPIRICAL_METHODS)
+    params = where_params + list(UNCATEGORIZED_TOPICS) + list(NON_EMPIRICAL_METHODS)
+
+    # Funder-acknowledgment rates for the scoping note, computed from the
+    # current filter so they track the applied years and topics. Denominators
+    # match the paper: research articles (usable abstract, classified to a
+    # topic and an empirical or review design) versus non-empirical works.
+    def _ack_rate(cond, cond_params):
+        denom = query_scalar(
+            f"SELECT COUNT(*) FROM works w WHERE TRUE {where} AND {cond}",
+            tuple(where_params + cond_params)) or 0
+        funded = query_scalar(
+            f"""SELECT COUNT(DISTINCT w.openalex_id) FROM works w
+                JOIN grants g ON w.openalex_id = g.openalex_id
+                WHERE TRUE {where} AND {cond}""",
+            tuple(where_params + cond_params)) or 0
+        return (100 * funded / denom) if denom else 0
+    _art_cond = (f"w.classified_topic AND w.topic_category NOT IN ({uc_placeholders}) "
+                 f"AND w.classified_method AND w.method_type NOT IN ({ne_placeholders})")
+    rate_article = _ack_rate(_art_cond,
+                             list(UNCATEGORIZED_TOPICS) + list(NON_EMPIRICAL_METHODS))
+    rate_nonemp = _ack_rate(f"w.method_type IN ({ne_placeholders})",
+                            list(NON_EMPIRICAL_METHODS))
 
     # Total funded papers in the current filter: denominator reused below.
     total_funded = query_scalar(
@@ -113,8 +135,9 @@ def page():
     st.info(
         'This page covers the **research corpus only**: commentary, editorials, '
         'and perspectives are excluded. They are opinion and discourse rather '
-        'than funded research projects, and name a funder far less often (about '
-        '37%, vs **65% of research papers**). Acknowledgment is also incompletely '
+        'than funded research projects, and name a funder far less often '
+        f'({rate_nonemp:.0f}%, vs **{rate_article:.0f}% of research articles**). '
+        'Acknowledgment is also incompletely '
         'recorded (and less so in earlier years), so these figures reflect '
         '*recorded* funding, not all funding.\n\n'
         'Every figure counts papers that **acknowledge** a funder, a proxy for a '
