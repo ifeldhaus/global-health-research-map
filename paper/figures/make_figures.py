@@ -51,12 +51,12 @@ mpl.rcParams.update({
     'axes.spines.top': False,
     'axes.spines.right': False,
     'axes.grid': True,
-    'grid.alpha': 0.25,
+    'grid.alpha': 0.2,
     'grid.linewidth': 0.5,
     'legend.frameon': False,
-    'axes.titlesize': 11,
-    'axes.titleweight': 'bold',
 })
+# No in-figure titles: each figure is titled by its LaTeX \caption, so an
+# in-figure title would duplicate it (Tufte: avoid redundant ink).
 
 con = duckdb.connect(str(DB), read_only=True)
 
@@ -88,32 +88,50 @@ def fig1_publications_by_year():
                color=SAFE[i % len(SAFE)], width=0.82, edgecolor='white', linewidth=0.3)
         bottom = [b + v for b, v in zip(bottom, y)]
     ax.set_xlabel('Year'); ax.set_ylabel('Publications')
-    ax.set_title('Publications by year, by journal')
-    ax.legend(ncol=2, fontsize=7.5, loc='upper left')
     ax.set_xlim(Y0 - 0.6, Y1 + 0.6)
+    # Legend below the axes, outside the data region.
+    ax.legend(ncol=3, fontsize=8, loc='upper center',
+              bbox_to_anchor=(0.5, -0.13), handlelength=1.1, columnspacing=1.2)
     save(fig, 'fig1_publications_by_year')
 
 
 # ---------------------------------------------------------------- Figure 2
-def fig2_funder_concentration():
-    rows = con.execute(
-        "SELECT publication_year, hhi, top_share FROM funder_hhi_by_year "
-        "WHERE publication_year BETWEEN ? AND ? ORDER BY 1", [Y0, Y1]).fetchall()
-    yrs = [r[0] for r in rows]
-    hhi = [r[1] for r in rows]
-    top = [r[2] * 100 if r[2] is not None and r[2] <= 1 else r[2] for r in rows]
-    fig, ax = plt.subplots(figsize=(7.2, 4.4))
-    l1, = ax.plot(yrs, hhi, color=OKABE[0], marker='o', lw=2, label='Concentration (HHI)')
-    ax.set_xlabel('Year'); ax.set_ylabel('Funding concentration (HHI)', color=OKABE[0])
-    ax.tick_params(axis='y', labelcolor=OKABE[0])
-    ax2 = ax.twinx(); ax2.grid(False)
-    l2, = ax2.plot(yrs, top, color=OKABE[1], marker='s', lw=2, ls='--',
-                   label='Top-funder share (%)')
-    ax2.set_ylabel('Top-funder share (%)', color=OKABE[1])
-    ax2.tick_params(axis='y', labelcolor=OKABE[1])
-    ax.set_title('Funding concentration over time')
-    ax.legend(handles=[l1, l2], loc='upper right', fontsize=8.5)
-    save(fig, 'fig2_funder_concentration')
+def fig2_top_funders():
+    """Share of funded research articles acknowledging each of the five most
+    frequent funders, by year. Shows rising vs fading funders directly."""
+    j = "REPLACE(g.funder_id,'https://openalex.org/','') = fu.openalex_id"
+    top = [r[0] for r in con.execute(
+        f"""WITH ra AS (SELECT openalex_id FROM works w WHERE {SUB}),
+             fa AS (SELECT DISTINCT g.openalex_id, fu.canonical_name cf
+                    FROM grants g JOIN funders fu ON {j})
+           SELECT cf, COUNT(DISTINCT ra.openalex_id) n
+           FROM ra JOIN fa USING(openalex_id) GROUP BY 1 ORDER BY 2 DESC LIMIT 5""").fetchall()]
+    denom = dict(con.execute(
+        f"""WITH ra AS (SELECT openalex_id, publication_year yr FROM works w WHERE {SUB}),
+             fa AS (SELECT DISTINCT openalex_id FROM grants)
+           SELECT yr, COUNT(DISTINCT ra.openalex_id) FROM ra JOIN fa USING(openalex_id)
+           WHERE ra.yr BETWEEN {Y0} AND {Y1} GROUP BY 1""").fetchall())
+    short = {'Bill & Melinda Gates Foundation': 'Gates Foundation',
+             'World Health Organization': 'WHO',
+             'MRC UK': 'UK MRC',
+             'Wellcome Trust': 'Wellcome Trust',
+             'National Institutes of Health': 'US NIH'}
+    fig, ax = plt.subplots(figsize=(7.4, 4.3))
+    for i, f in enumerate(top):
+        d = dict(con.execute(
+            f"""WITH ra AS (SELECT openalex_id, publication_year yr FROM works w WHERE {SUB}),
+                 fa AS (SELECT DISTINCT g.openalex_id FROM grants g
+                        JOIN funders fu ON {j} WHERE fu.canonical_name = ?)
+               SELECT ra.yr, COUNT(DISTINCT ra.openalex_id) FROM ra JOIN fa USING(openalex_id)
+               WHERE ra.yr BETWEEN {Y0} AND {Y1} GROUP BY 1""", [f]).fetchall())
+        yrs = sorted(denom)
+        vals = [100 * d.get(y, 0) / denom[y] for y in yrs]
+        ax.plot(yrs, vals, color=OKABE[i % len(OKABE)], lw=2, marker='.', ms=5,
+                label=short.get(f, f))
+    ax.set_xlabel('Year'); ax.set_ylabel('Share of funded research articles (%)')
+    ax.set_ylim(bottom=0)
+    ax.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), fontsize=9)
+    save(fig, 'fig2_top_funders')
 
 
 # ---------------------------------------------------------------- Figure 3
@@ -135,12 +153,12 @@ def fig3_externally_led():
         if len(pts) >= 3:
             ax.plot([p[0] for p in pts], [p[1] for p in pts], color=OKABE[i % len(OKABE)],
                     lw=1.2, alpha=0.7, marker='.', ms=4, label=names.get(rg, rg))
-    ax.plot([r[0] for r in ov], [r[1] for r in ov], color='black', lw=2.6,
+    ax.plot([r[0] for r in ov], [r[1] for r in ov], color='black', lw=2.8,
             marker='o', ms=4, label='All regions', zorder=5)
     ax.set_xlabel('Year'); ax.set_ylabel('Externally-led share (%)')
-    ax.set_title('Externally-led (parachute) research over time')
-    ax.legend(ncol=2, fontsize=8, loc='upper right')
     ax.set_ylim(bottom=0)
+    ax.legend(ncol=4, fontsize=8.5, loc='upper center', bbox_to_anchor=(0.5, -0.13),
+              columnspacing=1.3, handlelength=1.4)
     save(fig, 'fig3_externally_led')
 
 
@@ -177,9 +195,9 @@ def fig4_topic_share():
             ax.plot([p[0] for p in pts], [p[1] for p in pts], color=color, lw=2.4,
                     marker='.', ms=5, label=match, zorder=3)
     ax.set_xlabel('Year'); ax.set_ylabel('Share of research articles (%)')
-    ax.set_title('Topic share over time')
-    ax.legend(fontsize=7.8, loc='upper right', ncol=1)
     ax.set_ylim(bottom=0)
+    ax.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), fontsize=8.5,
+              title='Highest-movement topics', title_fontsize=8.5)
     save(fig, 'fig4_topic_share')
 
 
@@ -210,15 +228,15 @@ def fig5_north_south_leadership():
                  labels=['Low- & middle-income led', 'Both (mixed)', 'High-income led'],
                  colors=['#E69F00', '#BBBBBB', '#0072B2'], alpha=0.9)
     ax.set_xlabel('Year'); ax.set_ylabel('Share of research led (%)')
-    ax.set_title('Global North vs South research leadership over time')
     ax.set_ylim(0, 100); ax.set_xlim(Y0, Y1)
-    ax.legend(loc='center right', fontsize=8.5)
+    ax.legend(ncol=3, fontsize=8.5, loc='upper center', bbox_to_anchor=(0.5, -0.13),
+              columnspacing=1.4, handlelength=1.4)
     save(fig, 'fig5_north_south_leadership')
 
 
 if __name__ == '__main__':
     fig1_publications_by_year()
-    fig2_funder_concentration()
+    fig2_top_funders()
     fig3_externally_led()
     fig4_topic_share()
     fig5_north_south_leadership()
