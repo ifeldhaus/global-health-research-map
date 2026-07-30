@@ -10,6 +10,7 @@ import streamlit as st
 
 from dashboard.components import (
     check_data_ready,
+    page_subtitle,
     download_csv_button,
     metric_row,
     section_header,
@@ -59,7 +60,7 @@ _STATUS_LABELS = {
 
 def page():
     st.title('Data Completeness')
-    st.caption(
+    page_subtitle(
         'Abstract availability in the OpenAlex source data and its '
         'implications for topic and methods classification.'
     )
@@ -68,7 +69,7 @@ def page():
         return
 
     # -- Sidebar filters (year range only) --------------------------------
-    year_range = st.session_state.get('year_range', (2010, 2024))
+    year_range = st.session_state.get('year_range', (2010, 2025))
     where, params = build_where_clause(year_range=year_range)
     base_where = f"WHERE TRUE {where}"
 
@@ -282,19 +283,28 @@ def page():
 
     section_header('Methodological note')
 
-    st.info(
-        "**Systematic missingness in abstract data.** "
-        "Of the papers in this corpus, 25% lack usable abstracts in OpenAlex "
-        "and therefore could not be classified by topic or method. "
-        "This missingness is not random: it is concentrated in "
-        "*Lancet Global Health* (52%), *Annals of Global Health* (55%), "
-        "and *Globalization and Health* (68%), likely due to publisher "
-        "metadata policies and OpenAlex ingestion coverage. "
-        "Findings from the topic, methods, and geographic analyses should "
-        "be interpreted with awareness that these three journals are "
-        "underrepresented in the classified subset. "
-        "All papers remain in the corpus and are included in "
-        "publication volume, authorship, funder, and institution analyses "
-        "that do not depend on abstract-derived classifications.",
-        icon=':material/info:',
+    st.markdown(
+        f"**Systematic missingness in abstract data.** About "
+        f"{pct_missing:.0f}% of papers lack a usable abstract in OpenAlex and "
+        "could not be classified by topic or method. The gap is not random. "
+        "It concentrates in a few journals:"
+    )
+    st.markdown(
+        "- *Annals of Global Health*: ~54% of its papers missing\n"
+        "- *Bulletin of the World Health Organization*: ~26%\n"
+        "- *Tropical Medicine & International Health*: ~18%\n"
+        "- *Journal of Global Health*: ~14%\n"
+        "- *Lancet Global Health*, *PLOS Global Public Health*, "
+        "*Globalization and Health*: ≤5% (least affected)"
+    )
+    st.markdown(
+        "The gap reflects OpenAlex ingestion coverage for those journals, plus "
+        "genuine non-articles such as editorials, corrections, and issue "
+        "front-matter (e.g. “In this month’s Bulletin”), which have no abstract "
+        "by nature."
+    )
+    st.markdown(
+        "**What this affects:** topic, methods, and geographic analyses "
+        "under-represent the two high-missingness journals. Publication-volume, "
+        "authorship, funder, and institution analyses include all papers."
     )
