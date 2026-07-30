@@ -1,7 +1,7 @@
 """
 dashboard/pages/lens_c_topics.py
 
-Lens C — Topic Trends: Are we researching what matters most?
+Lens C (Topic Trends): Are we researching what matters most?
 
 Analytical interactions:
 - DALYs vs Deaths side-by-side (dual bar: do conclusions change by measure?)
@@ -20,25 +20,28 @@ import streamlit as st
 
 from dashboard.components import (
     check_data_ready, metric_row, section_header, download_csv_button,
+    page_subtitle,
 )
 from dashboard.constants import (
-    TOPIC_COLORS, TOPIC_LABELS, NON_EMPIRICAL_METHODS, UNCATEGORIZED_TOPICS,
-    QUAL_PALETTE, CHART_TEMPLATE, CHART_HEIGHT, CHART_HEIGHT_TALL,
+    TOPIC_COLORS, TOPIC_COLORS_BY_LABEL, TOPIC_LABELS, NON_EMPIRICAL_METHODS,
+    UNCATEGORIZED_TOPICS, QUAL_PALETTE, CHART_TEMPLATE, CHART_HEIGHT,
+    CHART_HEIGHT_TALL, LMIC_REGIONS, LMIC_BURDEN_LABEL,
 )
 from dashboard.db import query_df, query_scalar, build_where_clause, table_exists
 
 
 def page():
     st.title('Topic Trends')
-    st.caption(
-        'Are we researching what matters most? How does research attention '
-        'align with disease burden — and does it depend on how you measure it?'
+    page_subtitle(
+        'Which topics does global health research focus on most? Does that '
+        'effort match the disease burden, and is the balance changing over '
+        'time?'
     )
 
     if not check_data_ready(require_topics=True, require_gbd=True):
         return
 
-    year_range = st.session_state.get('year_range', (2010, 2024))
+    year_range = st.session_state.get('year_range', (2010, 2025))
     topics = st.session_state.get('selected_topics', [])
     where, params = build_where_clause(year_range=year_range, topics=topics or None)
 
@@ -56,6 +59,133 @@ def page():
 
     # Track research intensity data across sections
     df_ri = None
+
+    # ------------------------------------------------------------------
+    # Summary indicators (answer the subtitle questions at a glance)
+    # ------------------------------------------------------------------
+    df_tvol = query_df(
+        f"""SELECT w.publication_year AS year, w.topic_category AS cat,
+                   COUNT(*) AS n
+            FROM works w
+            {base_where} AND w.topic_category IS NOT NULL
+            GROUP BY 1, 2""",
+        tuple(params),
+    )
+    if not df_tvol.empty:
+        totals = df_tvol.groupby('cat')['n'].sum()
+        overall = totals.sum()
+        top_cat = totals.idxmax()
+        top_share = totals.max() / overall * 100
+
+        yr_tot = df_tvol.groupby('year')['n'].sum()
+        df_tvol['share'] = df_tvol.apply(
+            lambda r: r['n'] / yr_tot[r['year']] * 100, axis=1)
+        slopes = {c: float(np.polyfit(g['year'], g['share'], 1)[0])
+                  for c, g in df_tvol.groupby('cat')
+                  if g['year'].nunique() >= 5}
+        rising = max(slopes, key=slopes.get) if slopes else None
+        falling = min(slopes, key=slopes.get) if slopes else None
+
+        gap_cat, gap_note = None, None
+        if has_gbd:
+            _ph = ', '.join(['?'] * len(LMIC_REGIONS))
+            gy = query_scalar(
+                f"SELECT MAX(year) FROM gbd_burden WHERE measure = 'DALYs' "
+                f"AND metric = 'Number' AND region IN ({_ph})",
+                tuple(LMIC_REGIONS))
+            df_b = query_df(
+                f"""SELECT tbm.topic_category AS cat, SUM(g.val) AS v
+                    FROM topic_burden_map tbm
+                    JOIN gbd_burden g ON tbm.gbd_cause = g.cause
+                    WHERE g.measure = 'DALYs' AND g.metric = 'Number'
+                      AND g.sex = 'Both' AND g.age_group = 'All ages'
+                      AND g.region IN ({_ph}) AND g.year = ?
+                    GROUP BY 1""",
+                tuple(list(LMIC_REGIONS) + [gy]))
+            if not df_b.empty:
+                df_b['bshare'] = df_b['v'] / df_b['v'].sum() * 100
+                pub_sh = (totals / overall * 100).rename('pshare').reset_index()
+                merged = df_b.merge(pub_sh, on='cat')
+                merged['gap'] = merged['bshare'] - merged['pshare']
+                row = merged.loc[merged['gap'].idxmax()]
+                gap_cat = row['cat']
+                gap_note = (f"{row['bshare']:.0f}% of burden, "
+                            f"{row['pshare']:.0f}% of papers")
+
+        # Allow long topic names to wrap in the metric value (default truncates).
+        st.markdown(
+            '<style>'
+            '[data-testid="stMetricValue"],'
+            '[data-testid="stMetricValue"] > div,'
+            '[data-testid="stMetricValue"] p{'
+            'white-space:normal !important;overflow:visible !important;'
+            'text-overflow:clip !important;overflow-wrap:anywhere;'
+            'line-height:1.25}'
+            '[data-testid="stMetricValue"] p{font-size:1.5rem;margin:0}'
+            '</style>',
+            unsafe_allow_html=True,
+        )
+        gc = st.columns(4)
+        with gc[0]:
+            st.metric('Most-researched topic',
+                      TOPIC_LABELS.get(top_cat, top_cat),
+                      help='The topic category with the largest share of '
+                           'classified publications.')
+            st.caption(f'{top_share:.0f}% of papers')
+        with gc[1]:
+            st.metric('Largest burden–research gap',
+                      TOPIC_LABELS.get(gap_cat, gap_cat) if gap_cat else '—',
+                      help='The topic whose share of low- and middle-income '
+                           'disease burden most exceeds its share of '
+                           'publications.')
+            if gap_note:
+                st.caption(gap_note)
+        with gc[2]:
+            st.metric('Fastest-rising share',
+                      TOPIC_LABELS.get(rising, rising) if rising else '—',
+                      help='The topic whose share of publications has grown '
+                           'fastest over the study period.')
+            if rising:
+                st.caption(f'+{slopes[rising]:.1f} pp per year')
+        with gc[3]:
+            st.metric('Fastest-falling share',
+                      TOPIC_LABELS.get(falling, falling) if falling else '—',
+                      help='The topic whose share of publications has fallen '
+                           'fastest over the study period.')
+            if falling:
+                st.caption(f'{slopes[falling]:.1f} pp per year')
+
+    # ------------------------------------------------------------------
+    # Scoping note: under the summary indicators, above the first section.
+    # ------------------------------------------------------------------
+    st.info(
+        'These figures cover the **research corpus only**: commentary, '
+        'editorials, and perspectives are excluded. "Share of publications" '
+        'therefore means share of research articles, not of all content.',
+        icon=':material/info:',
+    )
+
+    # ------------------------------------------------------------------
+    # Share of publications by topic (opening view)
+    # ------------------------------------------------------------------
+    if not df_tvol.empty:
+        section_header(
+            'Share of Publications by Topic',
+            'How the corpus divides across topic areas.',
+        )
+        rank = df_tvol.groupby('cat')['n'].sum()
+        rank = (rank / rank.sum() * 100).rename('pct').reset_index()
+        rank['label'] = rank['cat'].map(lambda c: TOPIC_LABELS.get(c, c))
+        rank = rank.sort_values('pct')
+        fig = px.bar(
+            rank, y='label', x='pct', orientation='h',
+            color='cat', color_discrete_map=TOPIC_COLORS,
+            labels={'pct': 'Share of publications (%)', 'label': ''},
+            template=CHART_TEMPLATE,
+        )
+        fig.update_layout(height=max(400, len(rank) * 32), showlegend=False,
+                          yaxis={'categoryorder': 'total ascending'})
+        st.plotly_chart(fig, use_container_width=True)
 
     # ------------------------------------------------------------------
     # Topic publication volume over time
@@ -83,7 +213,7 @@ def page():
 
         fig = px.area(
             df_volume, x='year', y='n', color='label',
-            color_discrete_sequence=list(TOPIC_COLORS.values()),
+            color_discrete_map=TOPIC_COLORS_BY_LABEL,
             labels={'year': 'Year', 'n': 'Papers', 'label': 'Topic'},
             template=CHART_TEMPLATE,
         )
@@ -97,17 +227,23 @@ def page():
     # ------------------------------------------------------------------
     if has_gbd:
         section_header(
-            'Research Intensity: DALYs vs Deaths',
-            'Research intensity ratio = publication share / burden share. '
-            'Values > 1 indicate over-researched; < 1 under-researched. '
-            'Comparing both burden measures reveals where conclusions diverge.',
+            'Research Attention vs Disease Burden',
+            'Each topic\'s share of published research alongside its share of '
+            'low- and middle-income disease burden.',
         )
 
-        # Which year to use for burden — use the latest available GBD year
-        # that's within the publication year range
+        # Burden benchmark = pooled low- and middle-income (World Bank) burden,
+        # not global burden (which folds in the high-income NCD burden and would
+        # understate NCDs in a corpus that is overwhelmingly about LMIC settings).
+        # Placeholder list for the region IN (...) clause.
+        _lmic_ph = ', '.join(['?'] * len(LMIC_REGIONS))
+
+        # Which year to use for burden: latest year available for the LMIC
+        # income aggregates (2023; the income-level extract is a single year).
         gbd_year = query_scalar(
-            "SELECT MAX(year) FROM gbd_burden WHERE measure = 'DALYs' "
-            "AND metric = 'Number'"
+            f"SELECT MAX(year) FROM gbd_burden WHERE measure = 'DALYs' "
+            f"AND metric = 'Number' AND region IN ({_lmic_ph})",
+            tuple(LMIC_REGIONS),
         )
 
         if gbd_year:
@@ -133,9 +269,9 @@ def page():
                     WHERE g.measure = 'DALYs' AND g.metric = 'Number'
                       AND g.year = ? AND g.sex = 'Both'
                       AND g.age_group = 'All ages'
-                      AND g.region = 'Global'
+                      AND g.region IN ({_lmic_ph})
                     GROUP BY tbm.topic_category""",
-                (gbd_year,),
+                (gbd_year, *LMIC_REGIONS),
             )
 
             df_burden_deaths = query_df(
@@ -148,14 +284,14 @@ def page():
                     WHERE g.measure = 'Deaths' AND g.metric = 'Number'
                       AND g.year = ? AND g.sex = 'Both'
                       AND g.age_group = 'All ages'
-                      AND g.region = 'Global'
+                      AND g.region IN ({_lmic_ph})
                     GROUP BY tbm.topic_category""",
-                (gbd_year,),
+                (gbd_year, *LMIC_REGIONS),
             )
 
             if (not df_pub_share.empty and not df_burden_dalys.empty
                     and not df_burden_deaths.empty):
-                # Merge pub share with both burden measures
+                # Only topics with a GBD burden mapping can be compared.
                 df_ri = df_pub_share[['cat', 'pub_share']].merge(
                     df_burden_dalys[['cat', 'burden_share']].rename(
                         columns={'burden_share': 'burden_dalys'}
@@ -179,139 +315,68 @@ def page():
                     lambda c: TOPIC_LABELS.get(c, c)
                 )
 
-                # Key metric: most over- and under-researched
-                most_over = df_ri.loc[df_ri['ri_dalys'].idxmax()]
-                most_under = df_ri.loc[df_ri['ri_dalys'].idxmin()]
-
-                # Check if DALYs and Deaths agree
-                dalys_rank = df_ri.sort_values('ri_dalys')['cat'].tolist()
-                deaths_rank = df_ri.sort_values('ri_deaths')['cat'].tolist()
-                rank_agreement = (
-                    dalys_rank[:3] == deaths_rank[:3]  # top 3 under-researched agree
+                # Burden measure toggle (DALYs default; Deaths as a cross-check).
+                measure = st.radio(
+                    'Burden measure', ['DALYs', 'Deaths'],
+                    horizontal=True, key='ri_measure',
                 )
+                bcol = 'burden_dalys' if measure == 'DALYs' else 'burden_deaths'
 
-                # Key findings — use columns with markdown for readability
-                # (st.metric truncates long topic names)
-                ri_cols = st.columns(4)
-                with ri_cols[0]:
-                    st.markdown('**Most Over-Researched**')
-                    st.markdown(
-                        f":red[{most_over['label']}] "
-                        f"({most_over['ri_dalys']:.1f}x)"
-                    )
-                with ri_cols[1]:
-                    st.markdown('**Most Under-Researched**')
-                    st.markdown(
-                        f":green[{most_under['label']}] "
-                        f"({most_under['ri_dalys']:.1f}x)"
-                    )
-                with ri_cols[2]:
-                    st.markdown('**DALYs vs Deaths**')
-                    st.markdown(
-                        ':white_check_mark: Top 3 agree'
-                        if rank_agreement
-                        else ':warning: Rankings differ'
-                    )
-                with ri_cols[3]:
-                    st.markdown('**GBD Reference Year**')
-                    st.markdown(f"{int(gbd_year)}")
+                dd = df_ri.copy()
+                dd['pub_pct'] = dd['pub_share'] * 100
+                dd['bur_pct'] = dd[bcol] * 100
+                dd = dd.sort_values('bur_pct')
 
-                # Side-by-side grouped bar chart
-                fig = make_subplots(
-                    rows=1, cols=2,
-                    subplot_titles=['Research Intensity (DALYs-based)',
-                                    'Research Intensity (Deaths-based)'],
-                    shared_yaxes=True,
-                )
-
-                df_sorted = df_ri.sort_values('ri_dalys', ascending=True)
-
-                # DALYs panel
-                colors_dalys = [
-                    '#d62728' if v > 1.5 else '#2ca02c' if v < 0.5
-                    else '#ff7f0e' if v > 1 else '#1f77b4'
-                    for v in df_sorted['ri_dalys']
-                ]
-                fig.add_trace(
-                    go.Bar(
-                        y=df_sorted['label'], x=df_sorted['ri_dalys'],
-                        orientation='h', name='DALYs',
-                        marker_color=colors_dalys,
-                        hovertemplate='%{y}: %{x:.2f}x<extra>DALYs</extra>',
-                    ),
-                    row=1, col=1,
-                )
-
-                # Deaths panel
-                df_sorted_d = df_ri.sort_values('ri_dalys', ascending=True)
-                colors_deaths = [
-                    '#d62728' if v > 1.5 else '#2ca02c' if v < 0.5
-                    else '#ff7f0e' if v > 1 else '#1f77b4'
-                    for v in df_sorted_d['ri_deaths']
-                ]
-                fig.add_trace(
-                    go.Bar(
-                        y=df_sorted_d['label'], x=df_sorted_d['ri_deaths'],
-                        orientation='h', name='Deaths',
-                        marker_color=colors_deaths,
-                        hovertemplate='%{y}: %{x:.2f}x<extra>Deaths</extra>',
-                    ),
-                    row=1, col=2,
-                )
-
-                # Parity lines at x=1
-                for col in [1, 2]:
-                    fig.add_vline(
-                        x=1, line_dash='dash', line_color='gray',
-                        annotation_text='Parity', row=1, col=col,
-                    )
-
+                PUB_C, BUR_C = '#E69F00', '#CC79A7'
+                fig = go.Figure()
+                for _, r in dd.iterrows():
+                    fig.add_trace(go.Scatter(
+                        x=[r['bur_pct'], r['pub_pct']],
+                        y=[r['label'], r['label']],
+                        mode='lines', line=dict(color='#cccccc', width=2),
+                        showlegend=False, hoverinfo='skip',
+                    ))
+                fig.add_trace(go.Scatter(
+                    x=dd['bur_pct'], y=dd['label'], mode='markers',
+                    name=f'Share of LMIC disease burden ({measure})',
+                    marker=dict(color=BUR_C, size=12),
+                    hovertemplate='%{y}<br>Burden share: %{x:.1f}%<extra></extra>',
+                ))
+                fig.add_trace(go.Scatter(
+                    x=dd['pub_pct'], y=dd['label'], mode='markers',
+                    name='Share of publications',
+                    marker=dict(color=PUB_C, size=12),
+                    hovertemplate='%{y}<br>Publication share: %{x:.1f}%<extra></extra>',
+                ))
                 fig.update_layout(
                     template=CHART_TEMPLATE,
-                    height=max(500, len(df_ri) * 50),
-                    showlegend=False,
+                    height=max(500, len(dd) * 40),
+                    xaxis_title='Share (%)',
+                    legend=dict(orientation='h', y=1.06, title_text=''),
                 )
-                fig.update_xaxes(title_text='Research Intensity Ratio')
                 st.plotly_chart(fig, use_container_width=True)
 
                 st.info(
-                    '**How to read this chart:** The research intensity ratio '
-                    'compares each topic\'s share of publications to its share '
-                    'of global disease burden. A ratio of **1.0** (the dashed '
-                    'parity line) means a topic receives research attention '
-                    'exactly proportional to its burden. **Above 1** = '
-                    'over-researched relative to burden; **below 1** = '
-                    'under-researched. The left panel uses DALYs '
-                    '(disability-adjusted life years, which capture both '
-                    'premature death and years lived with disability) while the '
-                    'right panel uses Deaths alone. Comparing the two reveals '
-                    'topics where the choice of burden measure changes the '
-                    'conclusion \u2014 for instance, mental health conditions '
-                    'cause significant DALYs but fewer deaths, so a topic may '
-                    'appear under-researched by DALYs but adequately covered '
-                    'by deaths. Color coding: red (>1.5x), orange (1\u20131.5x), '
-                    'blue (0.5\u20131x), green (<0.5x).',
+                    'For each topic, the two dots '
+                    'show its share of published research (amber) and its share '
+                    f'of low- and middle-income disease burden (purple; '
+                    f'{measure}, GBD 2023). This shows where the literature '
+                    'sits relative to burden. Only topics with a GBD burden '
+                    'mapping are shown.\n\n'
+                    'A few things to keep in mind:\n\n'
+                    '- **Equal shares is an arbitrary benchmark.** Publications '
+                    'and disease burden measure different things.\n'
+                    '- **Publication counts proxy attention, not effort or '
+                    'funding.** Some fields produce many papers per study (for '
+                    'example trials and cohorts), others few, so a larger '
+                    'publication share need not mean more research resources.',
                     icon=':material/info:',
                 )
 
-                # Divergence highlights
-                df_ri['divergence'] = abs(df_ri['ri_dalys'] - df_ri['ri_deaths'])
-                biggest_div = df_ri.sort_values('divergence', ascending=False).head(3)
-                if not biggest_div.empty:
-                    st.info(
-                        '**Biggest divergences between DALYs and Deaths:** '
-                        + ', '.join([
-                            f"{row['label']} ({row['ri_dalys']:.1f}x DALYs vs "
-                            f"{row['ri_deaths']:.1f}x Deaths)"
-                            for _, row in biggest_div.iterrows()
-                        ]),
-                        icon=':material/compare_arrows:',
-                    )
-
                 download_csv_button(
-                    df_ri[['cat', 'label', 'pub_share', 'burden_dalys',
-                           'burden_deaths', 'ri_dalys', 'ri_deaths']],
-                    'research_intensity_comparison.csv',
+                    df_ri[['cat', 'label', 'pub_share',
+                           'burden_dalys', 'burden_deaths']],
+                    'research_attention_vs_burden.csv',
                 )
 
         # ------------------------------------------------------------------
@@ -319,30 +384,15 @@ def page():
         # ------------------------------------------------------------------
         if has_gbd and not df_volume.empty:
             section_header(
-                'Research Intensity Decomposition',
-                'Select a topic to see whether changes in research intensity '
-                'are driven by publication trends, burden trends, or both.',
+                'Publication Share vs Burden Share Over Time',
+                'Select a topic to see how its share of publications and its '
+                'share of disease burden each moved over time.',
             )
 
             # Build topic selector from available mappings
             mapped_topics = query_df(
                 "SELECT DISTINCT topic_category FROM topic_burden_map "
                 "ORDER BY topic_category"
-            )
-
-            st.info(
-                '**How to read this chart:** Research intensity can change '
-                'for two reasons: (1) the topic\'s share of publications '
-                'changes (left panel), or (2) the disease burden itself '
-                'shifts (right panel). By plotting both side by side, you '
-                'can see whether a topic is becoming more neglected because '
-                'researchers moved away, because the burden grew, or both. '
-                'For example, if the left panel (publication share) is flat '
-                'but the right panel (burden share) is rising, the topic is '
-                'becoming under-researched not because of declining interest '
-                'but because the disease is worsening. The auto-generated '
-                'interpretation below each pair summarizes the key takeaway.',
-                icon=':material/info:',
             )
 
             if not mapped_topics.empty:
@@ -417,6 +467,7 @@ def page():
                     if not df_pub_trend.empty:
                         fig = make_subplots(
                             rows=1, cols=2,
+                            shared_yaxes=True,
                             subplot_titles=[
                                 f'Publication Share: '
                                 f'{TOPIC_LABELS.get(decomp_topic, decomp_topic)}',
@@ -431,9 +482,7 @@ def page():
                                 y=df_pub_trend['pub_share'],
                                 mode='lines+markers',
                                 name='Publication Share',
-                                line=dict(color='#1f77b4', width=2),
-                                fill='tozeroy',
-                                fillcolor='rgba(31, 119, 180, 0.1)',
+                                line=dict(color='#E69F00', width=2),
                             ),
                             row=1, col=1,
                         )
@@ -445,9 +494,7 @@ def page():
                                     y=df_burden_trend['burden_share'],
                                     mode='lines+markers',
                                     name='Burden Share (DALYs)',
-                                    line=dict(color='#d62728', width=2),
-                                    fill='tozeroy',
-                                    fillcolor='rgba(214, 39, 40, 0.1)',
+                                    line=dict(color='#CC79A7', width=2),
                                 ),
                                 row=1, col=2,
                             )
@@ -455,7 +502,16 @@ def page():
                         fig.update_layout(
                             template=CHART_TEMPLATE, height=400,
                         )
-                        fig.update_yaxes(title_text='Share (%)')
+                        # Log y (fixed across both panels and every topic) so
+                        # small-share topics' trends stay legible instead of
+                        # being flattened against a large linear maximum.
+                        fig.update_yaxes(
+                            title_text='Share (%)', type='log',
+                            range=[np.log10(0.4), np.log10(60)],
+                            tickvals=[0.5, 1, 2, 5, 10, 20, 50],
+                            ticktext=['0.5', '1', '2', '5', '10', '20', '50'],
+                        )
+                        fig.update_xaxes(range=[year_range[0], year_range[1]])
                         st.plotly_chart(fig, use_container_width=True)
 
                         # Interpretation
@@ -466,36 +522,46 @@ def page():
                                              - df_burden_trend['burden_share'].iloc[0])
 
                             if pub_change > 0 and burden_change <= 0:
-                                interp = ('Research attention grew while burden share '
-                                          'stayed flat or declined \u2014 growing research '
-                                          'interest beyond burden.')
+                                interp = ('Publication share rose while burden '
+                                          'share was flat or falling.')
                             elif pub_change < 0 and burden_change >= 0:
-                                interp = ('Research attention declined while burden '
-                                          'stayed flat or grew \u2014 increasing neglect.')
+                                interp = ('Publication share fell while burden '
+                                          'share was flat or rising.')
                             elif pub_change < 0 and burden_change < 0:
-                                interp = ('Both research and burden shares declined '
-                                          '\u2014 declining burden may justify less attention.')
+                                interp = ('Both publication share and burden '
+                                          'share fell.')
                             else:
-                                interp = ('Both research and burden shares grew \u2014 '
-                                          'attention is tracking burden.')
+                                interp = ('Both publication share and burden '
+                                          'share rose.')
 
                             st.info(
-                                f'**Interpretation:** Pub share changed '
+                                f'**What changed:** Publication share changed '
                                 f'{pub_change:+.1f} pp, burden share changed '
                                 f'{burden_change:+.1f} pp. {interp}',
                                 icon=':material/analytics:',
                             )
 
-    # ------------------------------------------------------------------
-    # COVID displacement analysis
-    # ------------------------------------------------------------------
-    section_header(
-        'COVID Displacement Analysis',
-        'How did the COVID-19 pandemic reshape the global health research '
-        'agenda? Pre-2020 trends are projected forward to estimate '
-        'what would have happened without COVID.',
-    )
+                        st.info(
+                            'The left panel is the '
+                            'topic\'s share of publications over time; the '
+                            'right panel is its share of disease burden (DALYs) '
+                            'over time. Placing them side by side shows how the '
+                            'two trends move. Any resemblance is '
+                            'an ecological observation, not cause and effect: '
+                            'the direction, if there is one at all, could run '
+                            'either way. Both panels share a fixed log vertical '
+                            'axis, so small shares stay legible and topics can '
+                            'be compared directly. *The burden trend uses '
+                            'global GBD '
+                            'burden (1980–2023), the only series available year '
+                            'by year; the low- and middle-income burden shown '
+                            'earlier is a single-year (2023) snapshot.*',
+                            icon=':material/info:',
+                        )
 
+    # ------------------------------------------------------------------
+    # Yearly topic shares (shared by the two change charts below)
+    # ------------------------------------------------------------------
     df_shares = query_df(
         f"""WITH yearly AS (
                 SELECT publication_year AS year, topic_category AS cat,
@@ -514,13 +580,64 @@ def page():
             ORDER BY y.year, y.cat""",
         tuple(params),
     )
-
     if not df_shares.empty:
         df_shares['label'] = df_shares['cat'].map(
             lambda c: TOPIC_LABELS.get(c, c)
         )
 
-        # Compute pre-COVID (2010-2019) vs COVID/post-COVID (2020+) share changes
+    # ------------------------------------------------------------------
+    # Which topics are gaining or losing publication share
+    # ------------------------------------------------------------------
+    if not df_shares.empty:
+        yrs = sorted(df_shares['year'].unique())
+        n_end = min(3, max(1, len(yrs) // 3))
+        e0, e1 = int(yrs[0]), int(yrs[n_end - 1])
+        l0, l1 = int(yrs[-n_end]), int(yrs[-1])
+        early_lbl = f'{e0}' if e0 == e1 else f'{e0}–{e1}'
+        late_lbl = f'{l0}' if l0 == l1 else f'{l0}–{l1}'
+
+        section_header(
+            'Which Topics Are Gaining or Losing Share',
+            f'Change in each topic\'s share of publications from its '
+            f'{early_lbl} average to its {late_lbl} average.',
+        )
+
+        early = (df_shares[df_shares['year'].isin(yrs[:n_end])]
+                 .groupby('cat')['share'].mean())
+        late = (df_shares[df_shares['year'].isin(yrs[-n_end:])]
+                .groupby('cat')['share'].mean())
+        chg = (late - early).dropna().reset_index()
+        chg.columns = ['cat', 'change']
+        chg['label'] = chg['cat'].map(lambda c: TOPIC_LABELS.get(c, c))
+        chg = chg.sort_values('change')
+
+        fig = px.bar(
+            chg, y='label', x='change', orientation='h',
+            color='cat', color_discrete_map=TOPIC_COLORS,
+            labels={'change': 'Change in publication share (percentage points)',
+                    'label': ''},
+            template=CHART_TEMPLATE,
+        )
+        fig.add_vline(x=0, line_width=1, line_color='#888')
+        fig.update_layout(height=max(400, len(chg) * 32), showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption(
+            'Positive = the topic is a larger share of research now than at '
+            'the start of the period.'
+        )
+
+    # ------------------------------------------------------------------
+    # COVID displacement analysis (kept last: tangential but interesting)
+    # ------------------------------------------------------------------
+    if not df_shares.empty:
+        section_header(
+            'COVID Displacement Analysis',
+            'How did the COVID-19 pandemic reshape the global health research '
+            'agenda? Pre-2020 trends are projected forward to estimate '
+            'what would have happened without COVID.',
+        )
+
+        # Pre-COVID (2010-2019) vs COVID/post-COVID (2020+) share changes
         pre_covid = df_shares[df_shares['year'] < 2020].groupby('cat')['share'].mean()
         post_covid = df_shares[df_shares['year'] >= 2020].groupby('cat')['share'].mean()
 
@@ -534,11 +651,10 @@ def page():
             lambda c: TOPIC_LABELS.get(c, c)
         )
 
-        # Winners and losers
         df_shift_sorted = df_shift.sort_values('change')
 
         fig = go.Figure()
-        colors = ['#2ca02c' if v > 0 else '#d62728'
+        colors = ['#0072B2' if v > 0 else '#D55E00'
                   for v in df_shift_sorted['change']]
 
         fig.add_trace(go.Bar(
@@ -565,11 +681,9 @@ def page():
         # COVID counterfactual for the most impacted topics
         st.markdown('#### Counterfactual Projection for Key Topics')
         st.caption(
-            'Pre-COVID trend (2010\u20132019) projected forward as a dashed line. '
-            'The gap between projected and actual shows COVID\'s impact.'
+            'Pre-COVID trend (2010\u20132019) projected forward as a dashed line.'
         )
 
-        # Show top 3 most displaced topics
         top_displaced = df_shift.reindex(
             df_shift['change'].abs().sort_values(ascending=False).index
         ).head(4)
@@ -583,25 +697,19 @@ def page():
                 continue
 
             pre = topic_data[topic_data['year'] < 2020]
-            post = topic_data[topic_data['year'] >= 2020]
 
             with cols[idx % 2]:
                 fig = go.Figure()
-
-                # Actual data
                 fig.add_trace(go.Scatter(
                     x=topic_data['year'], y=topic_data['share'],
                     mode='lines+markers', name='Actual',
                     line=dict(color=TOPIC_COLORS.get(cat, '#333'), width=2),
                 ))
-
-                # Linear trend from pre-COVID projected forward
                 if len(pre) >= 3:
                     try:
                         coeffs = np.polyfit(pre['year'], pre['share'], 1)
                         all_years = topic_data['year'].values
                         projected = np.polyval(coeffs, all_years)
-
                         fig.add_trace(go.Scatter(
                             x=all_years, y=projected,
                             mode='lines', name='Pre-COVID trend',
@@ -609,7 +717,6 @@ def page():
                         ))
                     except Exception:
                         pass
-
                 fig.update_layout(
                     template=CHART_TEMPLATE,
                     height=300,
@@ -622,161 +729,3 @@ def page():
                     margin=dict(l=20, r=20, t=40, b=20),
                 )
                 st.plotly_chart(fig, use_container_width=True)
-
-    # ------------------------------------------------------------------
-    # Fashionability vs intensity quadrant
-    # ------------------------------------------------------------------
-    if has_gbd and not df_volume.empty:
-        section_header(
-            'Fashionability vs Research Intensity',
-            'X = fashionability (growth in publication share), '
-            'Y = research intensity ratio (pub share / burden share). '
-            'Quadrants reveal persistent neglect vs trending topics.',
-        )
-
-        # Compute fashionability: slope of publication share over time
-        if not df_shares.empty:
-            fashion_data = []
-            for cat in df_shares['cat'].unique():
-                cat_data = df_shares[df_shares['cat'] == cat]
-                if len(cat_data) >= 3:
-                    try:
-                        slope = np.polyfit(cat_data['year'], cat_data['share'], 1)[0]
-                        fashion_data.append({
-                            'cat': cat,
-                            'fashionability': slope,
-                        })
-                    except Exception:
-                        pass
-
-            df_fashion = None
-            if fashion_data:
-                df_fashion = pd.DataFrame(fashion_data)
-
-                # Merge with research intensity
-                if df_ri is not None and not df_ri.empty:
-                    df_quad = df_fashion.merge(
-                        df_ri[['cat', 'ri_dalys', 'label']], on='cat', how='inner'
-                    )
-
-                    if not df_quad.empty:
-                        fig = px.scatter(
-                            df_quad,
-                            x='fashionability', y='ri_dalys',
-                            color='label',
-                            color_discrete_map={
-                                TOPIC_LABELS.get(k, k): v
-                                for k, v in TOPIC_COLORS.items()
-                            },
-                            labels={
-                                'fashionability': 'Fashionability '
-                                                  '(annual share slope, pp/year)',
-                                'ri_dalys': 'Research Intensity Ratio '
-                                            '(DALYs-based)',
-                                'label': 'Topic',
-                            },
-                            template=CHART_TEMPLATE,
-                        )
-
-                        # Add quadrant lines at medians
-                        med_x = df_quad['fashionability'].median()
-                        med_y = 1.0  # parity line
-
-                        fig.add_hline(
-                            y=med_y, line_dash='dash', line_color='gray',
-                        )
-                        fig.add_vline(
-                            x=0, line_dash='dash', line_color='gray',
-                        )
-
-                        # Quadrant labels
-                        x_range = (df_quad['fashionability'].max()
-                                   - df_quad['fashionability'].min())
-                        y_max = df_quad['ri_dalys'].max()
-
-                        fig.add_annotation(
-                            x=df_quad['fashionability'].max() - x_range * 0.15,
-                            y=y_max * 0.9,
-                            text='Trendy + Over-researched',
-                            showarrow=False,
-                            font=dict(color='gray', size=9),
-                        )
-                        fig.add_annotation(
-                            x=df_quad['fashionability'].min() + x_range * 0.15,
-                            y=y_max * 0.9,
-                            text='Declining + Over-researched',
-                            showarrow=False,
-                            font=dict(color='gray', size=9),
-                        )
-                        fig.add_annotation(
-                            x=df_quad['fashionability'].max() - x_range * 0.15,
-                            y=0.15,
-                            text='Trendy + Under-researched',
-                            showarrow=False,
-                            font=dict(color='#2ca02c', size=10),
-                        )
-                        fig.add_annotation(
-                            x=df_quad['fashionability'].min() + x_range * 0.15,
-                            y=0.15,
-                            text='Persistent neglect',
-                            showarrow=False,
-                            font=dict(color='#d62728', size=10, weight='bold'),
-                        )
-
-                        fig.update_traces(marker_size=14)
-                        fig.update_layout(
-                            height=CHART_HEIGHT_TALL,
-                            legend=dict(font=dict(size=9), title_text=''),
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-
-                        st.info(
-                            '**How to read this chart:** Each dot is a topic '
-                            'category. The X-axis measures *fashionability* '
-                            '\u2014 whether a topic\'s share of publications is '
-                            'growing (right) or shrinking (left) over time. The '
-                            'Y-axis measures *research intensity* relative to '
-                            'disease burden (DALYs): above 1 means over-researched, '
-                            'below 1 means under-researched. **Persistent neglect** '
-                            '(bottom-left) is the most concerning: topics that are '
-                            'both under-researched AND losing share. '
-                            'If the chart appears sparse, it is because only '
-                            'topics with both GBD burden data and sufficient '
-                            'publication history (3+ years) can be plotted. '
-                            'Topics without a GBD burden mapping cannot be '
-                            'assessed for research intensity.',
-                            icon=':material/info:',
-                        )
-
-    # ------------------------------------------------------------------
-    # Topic publication share table
-    # ------------------------------------------------------------------
-    if not df_volume.empty:
-        section_header(
-            'Detailed Topic Data',
-            'Sortable table with publication counts and shares.',
-        )
-
-        df_summary = df_volume.groupby(['cat', 'label']).agg(
-            total_papers=('n', 'sum'),
-            first_year=('year', 'min'),
-            last_year=('year', 'max'),
-        ).reset_index()
-
-        total_all = df_summary['total_papers'].sum()
-        df_summary['share_pct'] = (
-            df_summary['total_papers'] / total_all * 100
-        ).round(1)
-        df_summary = df_summary.sort_values('total_papers', ascending=False)
-
-        st.dataframe(
-            df_summary[['label', 'total_papers', 'share_pct']].rename(
-                columns={
-                    'label': 'Topic',
-                    'total_papers': 'Papers', 'share_pct': 'Share (%)',
-                }
-            ),
-            use_container_width=True,
-            hide_index=True,
-        )
-        download_csv_button(df_summary, 'topic_summary.csv')
