@@ -47,3 +47,6 @@ validation/archive/
 
 # Subscription classification batches (generated)
 batches/
+
+# Paper writing archive — local only, never committed
+paper/
