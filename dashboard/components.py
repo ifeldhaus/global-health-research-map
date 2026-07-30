@@ -10,6 +10,16 @@ import streamlit as st
 from dashboard.db import get_pipeline_status
 
 
+def page_subtitle(text: str):
+    """Render a page subtitle under the title, larger and weightier than
+    st.caption, one line (wraps naturally), theme-adaptive."""
+    st.markdown(
+        "<div style='font-size:1.15rem;line-height:1.45;opacity:0.82;"
+        "font-weight:400;margin:-6px 0 16px'>" + text + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def empty_state(message: str, icon: str = 'info',
                 help_text: str | None = None):
     """Render a styled empty-state placeholder."""
@@ -25,7 +35,7 @@ def empty_state(message: str, icon: str = 'info',
 
 
 def pipeline_progress_card():
-    """Show which pipeline stages have data — useful before corpus is loaded."""
+    """Show which pipeline stages have data; useful before corpus is loaded."""
     status = get_pipeline_status()
     if not status:
         empty_state(
