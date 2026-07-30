@@ -1,13 +1,13 @@
-﻿canonical_name,funder_category,funder_country,openalex_id,aliases
+canonical_name,funder_category,funder_country,openalex_id,aliases
 National Institutes of Health,Government,US,F4320332161,NIH|US NIH|National Institute of Health|National Institutes of Health USA|NIH USA|Institutos Nacionales de la Salud
 Wellcome Trust,Philanthropic,UK,F4320311904,Wellcome|The Wellcome Trust|Wellcome Trust UK|WT
 Bill & Melinda Gates Foundation,Philanthropic,US,F4320306137,Gates Foundation|BMGF|Bill and Melinda Gates Foundation|Gates|The Bill & Melinda Gates Foundation|The Bill and Melinda Gates Foundation|B&MGF|GF
 USAID,Government,US,F4320306115,US Agency for International Development|United States Agency for International Development|USAID USA|U.S. Agency for International Development|Agency for International Development
 UK Foreign Commonwealth & Development Office,Government,UK,F4320330760,"FCDO|Foreign Commonwealth and Development Office|Foreign, Commonwealth & Development Office|Foreign, Commonwealth & Development Office, UK Government|UK Government|Ministry of Foreign Affairs of the United Kingdom"
-European Commission,Government,Multilateral,F4320320300,EU|European Union|EC|European Research Council|ERC|Horizon 2020|EU Commission|Europeiska kommissionen|Европейска комисия|Comisia Europeană|Europese Commissie|Euroopa Komisjoni|Eiropas Komisiju|Euroopan komission|Europskoj komisiji|Choimisiún Eorpaigh|EU-Kommissionen|Evropski komisiji|Comisión Europea|Europos Komisijos|Europäische Kommission|La Commissione europea|Evropská komise|Comissão Europeia|Európskej komisii|Европейская комиссия|Európai Bizottságról|Komisja Europejska|Commissione europea|Commission européenne
+European Commission,Multilateral,Multilateral,F4320320300,EU|European Union|EC|European Research Council|ERC|Horizon 2020|EU Commission|Europeiska kommissionen|Европейска комисия|Comisia Europeană|Europese Commissie|Euroopa Komisjoni|Eiropas Komisiju|Euroopan komission|Europskoj komisiji|Choimisiún Eorpaigh|EU-Kommissionen|Evropski komisiji|Comisión Europea|Europos Komisijos|Europäische Kommission|La Commissione europea|Evropská komise|Comissão Europeia|Európskej komisii|Европейская комиссия|Európai Bizottságról|Komisja Europejska|Commissione europea|Commission européenne
 Global Fund to Fight AIDS TB and Malaria,Multilateral,Multilateral,F4320307851,"Global Fund|The Global Fund|GFATM|Fonds mondial|The Global Fund to Fight AIDS, Tuberculosis and Malaria|Le Fonds mondial|Fonds mondial de lutte contre le sida, la tuberculose et le paludisme"
 Gavi the Vaccine Alliance,Multilateral,Multilateral,F4320306348,Gavi|GAVI|Gavi Alliance|Gavi Vaccine Alliance|Global Alliance for Vaccines and Immunization
-World Health Organization,UN Agency,Multilateral,F4320307856,WHO|World Health Organisation
+World Health Organization,Multilateral,Multilateral,F4320307856,WHO|World Health Organisation
 Swiss National Science Foundation,Government,Switzerland,F4320320924,SNSF|Swiss NSF|Schweizerischer Nationalfonds|Fondo Nazionale Svizzero|Fonds National Suisse|Schweizerische Nationalfonds|Fondo Nazionale Svizzero per la Ricerca Scientifica|Fonds National Suisse de la Recherche Scientifique|Swiss National Science Foundation|FNS|SNF|Schweizerischer Nationalfonds
 Canadian Institutes of Health Research,Government,Canada,F4320334506,CIHR|Canadian Institutes of Health|Instituts de recherche en santé du Canada|IRSC
 Australian National Health and Medical Research Council,Government,Australia,F4320334705,NHMRC|Australian NHMRC|National Health and Medical Research Council Australia|National Health and Medical Research Council
@@ -21,7 +21,7 @@ PATH,NGO,US,F4320308612,Program for Appropriate Technology in Health|PATH Intern
 UK DFID,Government,UK,F4320321637,DFID|Department for International Development|UK Department for International Development
 Economic and Social Research Council,Government,UK,F4320334630,ESRC|UK ESRC|UK Economic and Social Research Council
 National Institute for Health and Care Research,Government,UK,F4320319990,NIHR|National Institute for Health Research|UK NIHR|NIHR UK
-UNICEF,UN Agency,Multilateral,F4320309209,United Nations Children's Fund|United Nations International Children's Emergency Fund|UNICEF
+UNICEF,Multilateral,Multilateral,F4320309209,United Nations Children's Fund|United Nations International Children's Emergency Fund|UNICEF
 National Cancer Institute,Government,US,F4320337351,NCI|US NCI|National Cancer Institute USA
 China Scholarship Council,Government,China,F4320322725,CSC|China Scholarship Council
 Pan American Health Organization,Multilateral,Multilateral,F4320333249,PAHO|OPS|Organizacion Panamericana de la Salud
@@ -75,7 +75,7 @@ Government of Canada,Government,Canada,F4320319880,Gouvernement du Canada
 NIHR Oxford Biomedical Research Centre,Government,UK,F4320336045,NIHR Oxford BRC|Oxford BRC
 Australian Agency for International Development,Government,Australia,F4320320412,AusAID
 European Centre for Disease Prevention and Control,Multilateral,Multilateral,F4320320304,ECDC
-Innovative Medicines Initiative,Government,Multilateral,F4320326631,IMI|IMI2
+Innovative Medicines Initiative,Multilateral,Multilateral,F4320326631,IMI|IMI2
 Heart and Stroke Foundation of Canada,Philanthropic,Canada,F4320307845,HSF|HSFC
 "National Heart, Lung, and Blood Institute",Government,US,F4320337338,NHLBI|NIH NHLBI
 Public Health Agency of Canada,Government,Canada,F4320312568,PHAC
@@ -87,7 +87,7 @@ Institute for Health Metrics and Evaluation,NGO,US,F4320315116,IHME
 National Natural Science Foundation of China,Philanthropic,China,F4320321001,NSFC
 Chinese Center for Disease Control and Prevention,Government,China,F4320322662,China CDC|Chinese CDC
 Novavax,Pharmaceutical,US,F4320314772,Novavax Inc
-European Federation of Pharmaceutical Industries and Associations,Multilateral,Multilateral,F4320314178,EFPIA
+European Federation of Pharmaceutical Industries and Associations,Pharmaceutical,Multilateral,F4320314178,EFPIA
 National Research Foundation,Philanthropic,South Africa,F4320320671,NRF|NRF South Africa
 Directorate for Biological Sciences,Government,US,F4320332167,BIO|NSF BIO
 Brien Holden Vision Institute,Philanthropic,Australia,F4320313001,BHVI
@@ -148,7 +148,7 @@ Cilag,Pharmaceutical,Switzerland,F4320338413,Cilag GmbH International|Johnson & 
 Rotary Foundation,Philanthropic,US,F4320307891,TRF|The Rotary Foundation
 Governo Brasil,Government,Brazil,F4320321178,Brazilian Government|Government of Brazil
 Institut pour la Recherche en Santé Publique,Government,France,F4320330835,IReSP
-Seventh Framework Programme,Government,Multilateral,F4320333065,FP7|EU FP7|Framework Programme 7
+Seventh Framework Programme,Multilateral,Multilateral,F4320333065,FP7|EU FP7|Framework Programme 7
 Socialstyrelsen,Government,Sweden,F4320335013,Swedish National Board of Health and Welfare
 Biosecurity Queensland,Government,Australia,F4320338108,BQ
 United Nations Development Programme,Multilateral,Multilateral,F4320316420,UNDP
@@ -184,7 +184,7 @@ Sandler Foundation,Philanthropic,US,F4320309508,Sandler
 Office of Food for Peace,Government,US,F4320316863,FFP|USAID FFP
 Laura and John Arnold Foundation,Philanthropic,US,F4320311571,Arnold Foundation|Arnold Ventures
 Vital Strategies,NGO,US,F4320319758,Vital Strategies Inc
-H2020 European Research Council,Government,Multilateral,F4320338335,H2020 ERC|Horizon 2020 ERC
+H2020 European Research Council,Multilateral,Multilateral,F4320338335,H2020 ERC|Horizon 2020 ERC
 Robert Wood Johnson Foundation,Philanthropic,US,F4320306139,RWJF
 Genentech,Pharmaceutical,US,F4320332193,Genentech Inc|Roche
 Cancerfonden,Government,Sweden,F4320321491,Swedish Cancer Society
@@ -244,4 +244,4 @@ EcoHealth Alliance,Philanthropic,US,F4320317348,EHA
 Thailand Research Fund,Government,Thailand,F4320322614,TRF|สำนักงานกองทุนสนับสนุนการวิจัย
 Coordenação de Aperfeiçoamento de Pessoal de Nível Superior,Government,Brazil,F4320321091,CAPES
 Nvidia,Pharmaceutical,US,F4320309480,NVIDIA Corporation
-European Regional Development Fund,Government,Multilateral,F4320335322,ERDF|FEDER
+European Regional Development Fund,Multilateral,Multilateral,F4320335322,ERDF|FEDER
