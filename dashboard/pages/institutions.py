@@ -52,7 +52,12 @@ def page():
     ne_placeholders = ', '.join(['?'] * len(NON_EMPIRICAL_METHODS))
     ne_clause = (f" AND (w.method_type IS NULL "
                  f"OR w.method_type NOT IN ({ne_placeholders}))")
-    base_where = f"WHERE TRUE {where}{uc_clause}{ne_clause}"
+    # Restrict to the research-article subset: exclude papers with no usable
+    # abstract (never classified). Their content could not be verified and the
+    # records are more likely to be non-articles, so they are dropped from all
+    # institution analyses, consistent with the rest of the analytic lenses.
+    base_where = (f"WHERE TRUE {where}{uc_clause}{ne_clause} "
+                  f"AND w.classified_topic AND w.classified_method")
     params = where_params + list(UNCATEGORIZED_TOPICS) + list(NON_EMPIRICAL_METHODS)
 
     # Umbrella names (e.g. "Ministry of Health") that OpenAlex shares across

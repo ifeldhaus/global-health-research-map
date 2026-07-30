@@ -204,12 +204,12 @@ def fig4_topic_share():
 # ---------------------------------------------------------------- Figure 5
 def fig5_north_south_leadership():
     hi = tuple(HIGH_INCOME_ISO2)
+    # Research-article subset (n = 19,035), consistent with the rest of the
+    # Producing Institutions section (institution counts, concentration, etc.).
     q = f"""WITH pc AS (
         SELECT DISTINCT a.openalex_id wid, w.publication_year yr, a.institution_country cc
         FROM authorships a JOIN works w ON a.openalex_id = w.openalex_id
-        WHERE w.publication_year BETWEEN {Y0} AND {Y1}
-          AND (w.topic_category IS NULL OR w.topic_category NOT IN ('Z'))
-          AND (w.method_type IS NULL OR w.method_type NOT IN ('M14','M15','M18'))
+        WHERE {SUB} AND w.publication_year BETWEEN {Y0} AND {Y1}
           AND a.position IN ('first','last')
           AND a.institution_country IS NOT NULL AND a.institution_country <> ''),
     pg AS (SELECT wid, yr,
