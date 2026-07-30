@@ -50,6 +50,27 @@ def query_scalar(sql: str, params: tuple | None = None):
         con.close()
 
 
+@st.cache_data(ttl=300)
+def shared_institution_names() -> frozenset:
+    """Display names shared by more than one OpenAlex institution ID.
+
+    These are umbrella names (e.g. "Ministry of Health") that OpenAlex assigns
+    to distinct national entities. Callers disambiguate them by appending the
+    country so each is treated as its own institution.
+    """
+    con = get_connection()
+    try:
+        rows = con.execute(
+            """SELECT institution_name FROM authorships
+               WHERE institution_name IS NOT NULL AND institution_name <> ''
+               GROUP BY institution_name
+               HAVING COUNT(DISTINCT institution_id) > 1"""
+        ).fetchall()
+        return frozenset(r[0] for r in rows)
+    finally:
+        con.close()
+
+
 def table_exists(name: str) -> bool:
     """Check if a table exists and has at least one row."""
     try:
