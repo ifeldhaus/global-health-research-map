@@ -188,16 +188,10 @@ def genderize_all(unique_names: list[str]) -> dict[str, tuple[str, float]]:
             cache.update(results)
         except QuotaExhaustedError as e:
             print(f'\n  ERROR: {e}')
-            # Mark all remaining names as unknown
-            for j in range(i, total):
-                name = unique_names[j].lower()
-                if name not in cache:
-                    cache[name] = ('unknown', 0.0)
-            remaining = total - len(cache) + sum(
-                1 for v in cache.values() if v == ('unknown', 0.0)
-            )
-            print(f'  Resolved {i:,}/{total:,} names before quota hit. '
-                  f'Re-run after reset to continue.')
+            # Leave unresolved names OUT of the cache so their works stay NULL
+            # and get retried on the next run (resumable across daily quotas).
+            print(f'  Resolved {len(cache):,}/{total:,} names before quota hit. '
+                  f'Unresolved names are left for the next run.')
             break
         except Exception as e:
             print(f'  WARNING: genderize batch failed after retries: {e}')
@@ -265,6 +259,33 @@ def load_unclassified(con: duckdb.DuckDBPyConnection,
         {'openalex_id': r[0], 'first_author': r[1], 'last_author': r[2]}
         for r in rows
     ]
+
+
+def seed_from_db(con: duckdb.DuckDBPyConnection) -> dict[str, tuple[str, float]]:
+    """Rebuild a name -> (gender, probability) cache from works already gendered,
+    so previously-resolved names are not re-queried against the daily quota."""
+    seed: dict[str, tuple[str, float]] = {}
+    rows = con.execute("""
+        SELECT (SELECT a.author_name FROM authorships a
+                WHERE a.openalex_id = w.openalex_id AND a.position='first' LIMIT 1) AS fa,
+               w.gender_first,
+               (SELECT a.author_name FROM authorships a
+                WHERE a.openalex_id = w.openalex_id AND a.position='last' LIMIT 1) AS la,
+               w.gender_last
+        FROM works w
+        WHERE w.gender_first IS NOT NULL
+    """).fetchall()
+    for fa, gf, la, gl in rows:
+        for nm, stored in ((fa, gf), (la, gl)):
+            fn = extract_first_name(nm)
+            if not fn or not stored or '|' not in stored:
+                continue
+            gender, prob = stored.rsplit('|', 1)
+            try:
+                seed.setdefault(fn.lower(), (gender, float(prob)))
+            except ValueError:
+                continue
+    return seed
 
 
 def write_results(con: duckdb.DuckDBPyConnection,
@@ -335,15 +356,25 @@ def main():
             name_set.add(fn.lower())
 
     unique_names = sorted(name_set)
-    print(f'  {len(unique_names):,} unique first names to genderize')
 
-    # --- Step 2: Genderize all unique names ---------------------------------
+    # Seed from names already resolved in prior runs so they are not re-queried
+    # against the daily quota; only genuinely-new names go to the API.
+    seed = {} if MOCK else seed_from_db(con)
+    to_query = [n for n in unique_names if n not in seed]
+    print(f'  {len(unique_names):,} unique names; {len(seed):,} known from prior '
+          f'runs, {len(to_query):,} new to query')
+
+    # --- Step 2: Genderize the new unique names -----------------------------
     if MOCK:
         gender_cache = mock_genderize(unique_names)
         print(f'  Mock genderization complete. {len(gender_cache):,} names resolved.')
     else:
-        gender_cache = genderize_all(unique_names)
-        print(f'  Genderization complete. {len(gender_cache):,} names resolved.')
+        gender_cache = genderize_all(to_query)
+        for n in unique_names:            # merge seeded names for the write step
+            if n in seed and n not in gender_cache:
+                gender_cache[n] = seed[n]
+        print(f'  Genderization complete. {len(gender_cache):,} names available '
+              f'({len(to_query):,} queried this run).')
 
     # --- Step 3: Apply results in chunks and write to DB --------------------
     total = 0
@@ -352,17 +383,21 @@ def main():
         results = []
 
         for w in chunk:
-            # First author gender
             fn_first = extract_first_name(w['first_author'])
-            if fn_first and fn_first.lower() in gender_cache:
+            fn_last = extract_first_name(w['last_author'])
+            # Skip works whose named authors were not resolved this run (daily
+            # quota did not reach them). They stay NULL and retry next run.
+            if (fn_first and fn_first.lower() not in gender_cache) or \
+               (fn_last and fn_last.lower() not in gender_cache):
+                continue
+
+            if fn_first:
                 g, p = gender_cache[fn_first.lower()]
                 gf = format_gender(g, p)
             else:
                 gf = format_gender('unknown', 0.0)
 
-            # Last author gender
-            fn_last = extract_first_name(w['last_author'])
-            if fn_last and fn_last.lower() in gender_cache:
+            if fn_last:
                 g, p = gender_cache[fn_last.lower()]
                 gl = format_gender(g, p)
             else:
