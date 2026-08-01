@@ -27,7 +27,7 @@ def page():
     st.title('Overview')
     page_subtitle(
         'The corpus behind the analysis: global health research papers from '
-        '11 global health journals, 2010 through July 2026 (2026 is a partial year).'
+        '16 global health journals, 2010 through July 2026 (2026 is a partial year).'
     )
 
     # ------------------------------------------------------------------
@@ -38,7 +38,7 @@ def page():
         st.markdown(
             '### Data Sources\n\n'
             'This dashboard draws on a bibliometric corpus of global health '
-            'research papers published between **2010 and July 2026** (2026 is a partial year) in **11 global '
+            'research papers published between **2010 and July 2026** (2026 is a partial year) in **16 global '
             'health journals** selected for their prominence in the field:\n\n'
             '- *Lancet Global Health*\n'
             '- *BMJ Global Health*\n'
@@ -50,7 +50,12 @@ def page():
             '- *Tropical Medicine & International Health*\n'
             '- *Journal of Global Health*\n'
             '- *Global Health Science and Practice*\n'
-            '- *Annals of Global Health*\n\n'
+            '- *Annals of Global Health*\n'
+            '- *Global Health Action*\n'
+            '- *International Health*\n'
+            '- *Journal of Epidemiology and Global Health*\n'
+            '- *Global Health Research and Policy*\n'
+            '- *Global Health Journal*\n\n'
             'Metadata for each paper (title, abstract, authors, '
             'institutions, and funding acknowledgements) was retrieved '
             'from [OpenAlex](https://openalex.org/), an open bibliometric '
@@ -86,7 +91,7 @@ def page():
             'study is used in the Topic Trends lens to compare research '
             'attention against actual disease burden (DALYs and deaths).\n\n'
             '### Important Limitations\n\n'
-            '- **13% of papers (4,516 of 33,964) lack usable abstracts** in OpenAlex and '
+            '- **12% of papers (4,769 of 39,905) lack usable abstracts** in OpenAlex and '
             'could not be topic- or method-classified. This missingness '
             'is systematic, concentrated in specific journals '
             '(see the [Data Completeness](/data-completeness) page for '
@@ -216,7 +221,7 @@ def page():
         fig = px.bar(
             df_year, x='year', y='n', color='journal',
             category_orders={'journal': journal_order},
-            color_discrete_sequence=px.colors.qualitative.Safe,
+            color_discrete_sequence=px.colors.qualitative.Dark24,
             labels={'year': 'Publication Year', 'n': 'Papers',
                     'journal': 'Journal'},
             template=CHART_TEMPLATE,

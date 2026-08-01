@@ -80,7 +80,7 @@ pg = st.navigation(pages)
 
 with st.sidebar:
     st.title(':earth_americas: Power and Priority in Global Health Research')
-    st.caption('Who leads it, who funds it, and what it studies, across 11 global health journals, 2010–2026')
+    st.caption('Who leads it, who funds it, and what it studies, across 16 global health journals, 2010–2026')
 
     st.divider()
 
