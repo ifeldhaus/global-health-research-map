@@ -14,10 +14,13 @@ validation for every axis):
   - method_type      : first-run
   - study_country    : original
 
-Gold:
-  validation/validation_labels.csv      199 development labels
-  validation/validation_labels_run2.csv 146 held-out (sealed) labels
-The sealed 150 was drawn excluding the 199, so pooled = 345 distinct papers.
+Gold (consolidated into one file with a `source` column):
+  validation/validation_labels_all.csv  405 labels across three rounds
+    - dev        199  development labels
+    - sealed     146  held-out (sealed) labels, drawn excluding the 199
+    - expansion   60  held-out labels from the five journals added in the
+                      16-journal expansion (1 SKIP)
+Pooled = 404 usable, distinct papers, all against the first-run classifier.
 
 Usage:  uv run python validation/compute_kappa.py
 """
@@ -26,8 +29,7 @@ from collections import Counter
 import duckdb
 
 DB = 'data/global_health.duckdb'
-GOLDS = [('validation/validation_labels.csv', 'dev'),
-         ('validation/validation_labels_run2.csv', 'sealed')]
+GOLDS = [('validation/validation_labels_all.csv', 'all')]
 
 
 def clean(x):
