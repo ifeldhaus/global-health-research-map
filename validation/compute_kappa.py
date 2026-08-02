@@ -25,6 +25,7 @@ Pooled = 404 usable, distinct papers, all against the first-run classifier.
 Usage:  uv run python validation/compute_kappa.py
 """
 import csv
+import os
 from collections import Counter
 import duckdb
 
@@ -92,6 +93,24 @@ def main():
     print(f'  Country                    kappa = {cp[2]:.3f}   (exact-set {cex:.3f})')
     print('\n(Cohen\'s kappa; country by primary-country with set-exact shown. All axes are the '
           'first-run/untuned classifier, so the full validation set is a clean held-out check.)')
+
+    # ---- emit the paper's validation table (tab:validation) ----------------
+    def descr(k):
+        return ('almost perfect' if k >= 0.81 else 'substantial' if k >= 0.61
+                else 'moderate' if k >= 0.41 else 'fair' if k >= 0.21 else 'slight')
+    tex = [r'\begin{table}[ht]', r'\centering',
+           f'\\caption{{Classification agreement against {len(ids)} blind hand-labeled works.}}',
+           r'\label{tab:validation}', r'\begin{tabular}{lrl}', r'\toprule',
+           r"Label axis & Cohen's $\kappa$ & Agreement \\", r'\midrule',
+           f'Topic, primary category & {tp[2]:.2f} & {descr(tp[2])} ' + r'\\',
+           f'Topic, primary subtopic & {ts[2]:.2f} & {descr(ts[2])} ' + r'\\',
+           f'Study design            & {mp[2]:.2f} & {descr(mp[2])} ' + r'\\',
+           f'Study country           & {cp[2]:.2f} & {descr(cp[2])} ' + r'\\',
+           r'\bottomrule', r'\end{tabular}', r'\end{table}']
+    out = os.path.join(os.path.dirname(__file__), '..', 'paper', 'validation_table.tex')
+    if os.path.isdir(os.path.dirname(out)):
+        open(out, 'w').write('\n'.join(tex) + '\n')
+        print(f'\nwrote {os.path.normpath(out)}')
 
 
 if __name__ == '__main__':
