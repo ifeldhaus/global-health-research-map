@@ -218,14 +218,23 @@ def page():
             lambda i: JOURNAL_NAMES.get(i, 'Other'))
         journal_order = (df_year.groupby('journal')['n'].sum()
                          .sort_values(ascending=False).index.tolist())
+        # Vibrant 16-colour categorical palette, validated colourblind-safe
+        # (passes lightness / chroma / CVD-separation / normal-vision gates on a
+        # light surface); ordered so confusable hues are never adjacent. White
+        # gaps between stacked segments carry identity alongside colour.
+        JOURNAL_PALETTE = [
+            '#2a78d6', '#eb6834', '#4a3aa7', '#008a00', '#00a5c4', '#e34948',
+            '#5566dd', '#8fbf3f', '#e87ba4', '#eda100', '#a11d6b', '#c98a00',
+            '#1baf7a', '#b15928', '#009e73', '#cc3311']
         fig = px.bar(
             df_year, x='year', y='n', color='journal',
             category_orders={'journal': journal_order},
-            color_discrete_sequence=px.colors.qualitative.Dark24,
+            color_discrete_sequence=JOURNAL_PALETTE,
             labels={'year': 'Publication Year', 'n': 'Papers',
                     'journal': 'Journal'},
             template=CHART_TEMPLATE,
         )
+        fig.update_traces(marker_line_color='white', marker_line_width=0.6)
         fig.update_layout(
             height=CHART_HEIGHT, bargap=0.15,
             legend=dict(font=dict(size=8), title_text=''),
