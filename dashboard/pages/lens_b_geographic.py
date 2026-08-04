@@ -116,52 +116,30 @@ def page():
     # Parachute rate over time
     # ------------------------------------------------------------------
     section_header(
-        'Parachute Rate Over Time',
-        'Proportion of papers where the study country has no local '
-        'first (and/or last) author.',
+        'Externally-led (parachute) research over time',
+        'Share of single-country research where no author is affiliated with the '
+        'study country.',
     )
-
-    parachute_def = st.radio(
-        'Parachute science definition',
-        ['No local first or last author (strict)',
-         'No local first author only (relaxed)'],
-        key='parachute_def',
-        horizontal=True,
-    )
-    strict = 'strict' in parachute_def
-
-    if strict:
-        parachute_condition = """
-            AND first_author_country != study_country
-            AND last_author_country != study_country
-        """
-    else:
-        parachute_condition = """
-            AND first_author_country != study_country
-        """
 
     df_parachute = query_df(
         f"""WITH paper_authors AS (
-                SELECT w.openalex_id, w.publication_year, w.study_country,
-                       MAX(CASE WHEN a.position = 'first'
-                           THEN a.institution_country END) AS first_author_country,
-                       MAX(CASE WHEN a.position = 'last'
-                           THEN a.institution_country END) AS last_author_country
+                SELECT w.openalex_id, w.publication_year,
+                       MAX(CASE WHEN a.institution_country = w.study_country
+                           THEN 1 ELSE 0 END) AS has_local
                 FROM works w
                 JOIN authorships a ON w.openalex_id = a.openalex_id
                 {base_where}
                 AND w.study_country IS NOT NULL
-                AND w.study_country != 'GLOBAL'
+                AND w.study_country NOT IN ('GLOBAL', 'UNKNOWN')
+                AND w.study_country NOT LIKE '%|%'
+                AND a.institution_country IS NOT NULL
+                AND a.institution_country <> ''
                 GROUP BY w.openalex_id, w.publication_year, w.study_country
             )
             SELECT publication_year AS year,
                    COUNT(*) AS total,
-                   SUM(CASE WHEN first_author_country IS NOT NULL
-                            AND last_author_country IS NOT NULL
-                            {parachute_condition}
-                       THEN 1 ELSE 0 END) AS parachute
+                   SUM(CASE WHEN has_local = 0 THEN 1 ELSE 0 END) AS parachute
             FROM paper_authors
-            WHERE first_author_country IS NOT NULL
             GROUP BY publication_year
             ORDER BY year""",
         tuple(params),
@@ -206,11 +184,11 @@ def page():
         '**Parachute science** (also called *helicopter* or *parasitic* '
         'research) is research conducted in a country, usually a low- or '
         'middle-income one, by researchers based elsewhere, with little or no '
-        'leadership from local scientists. Here it is measured as papers about a '
-        'given study country in which **no author affiliated with that country '
-        'is a first author** (*relaxed*), or **a first or last author** '
-        '(*strict*). This is a proxy built from author affiliation and '
-        'authorship position, not a judgment of any individual collaboration.',
+        'leadership from local scientists. Here it is measured, for single-country '
+        'studies, as papers in which **no author at any position is affiliated '
+        'with the study country** (matching the analysis in the paper). This is a '
+        'proxy built from author affiliation, not a judgment of any individual '
+        'collaboration.',
         icon=':material/info:',
     )
 
@@ -399,25 +377,24 @@ def page():
 
     df_para_topic = query_df(
         f"""WITH paper_info AS (
-                SELECT w.openalex_id, w.topic_category, w.study_country,
-                       MAX(CASE WHEN a.position = 'first'
-                           THEN a.institution_country END) AS first_country,
-                       MAX(CASE WHEN a.position = 'last'
-                           THEN a.institution_country END) AS last_country
+                SELECT w.openalex_id, w.topic_category,
+                       MAX(CASE WHEN a.institution_country = w.study_country
+                           THEN 1 ELSE 0 END) AS has_local
                 FROM works w
                 JOIN authorships a ON w.openalex_id = a.openalex_id
                 {base_where}
-                AND w.study_country IS NOT NULL AND w.study_country != 'GLOBAL'
+                AND w.study_country IS NOT NULL
+                AND w.study_country NOT IN ('GLOBAL', 'UNKNOWN')
+                AND w.study_country NOT LIKE '%|%'
                 AND w.topic_category IS NOT NULL
+                AND a.institution_country IS NOT NULL
+                AND a.institution_country <> ''
                 GROUP BY w.openalex_id, w.topic_category, w.study_country
             )
             SELECT topic_category AS cat,
                    COUNT(*) AS total,
-                   SUM(CASE WHEN first_country IS NOT NULL
-                            AND first_country != study_country
-                       THEN 1 ELSE 0 END) AS parachute
+                   SUM(CASE WHEN has_local = 0 THEN 1 ELSE 0 END) AS parachute
             FROM paper_info
-            WHERE first_country IS NOT NULL
             GROUP BY topic_category""",
         tuple(params),
     )
