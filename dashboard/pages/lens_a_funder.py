@@ -78,10 +78,13 @@ def page():
                             list(NON_EMPIRICAL_METHODS))
 
     # Total funded papers in the current filter: denominator reused below.
+    # Counts works with at least one grant (any funder, whether or not the
+    # funder_id resolves to the funders table), matching the paper's "funded
+    # articles" denominator (n = 14,999). Restricting to resolvable funders
+    # would shrink the denominator and inflate every share below.
     total_funded = query_scalar(
         f"""SELECT COUNT(DISTINCT g.openalex_id)
             FROM grants g
-            JOIN funders f ON REPLACE(g.funder_id, 'https://openalex.org/', '') = f.openalex_id
             JOIN works w ON g.openalex_id = w.openalex_id
             {base_where}""",
         tuple(params),
