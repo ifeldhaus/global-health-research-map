@@ -50,3 +50,13 @@ batches/
 
 # Paper writing archive — local only, never committed
 paper/
+
+# Validation: keep only the reproducible scripts in git; hand-labeled data,
+# labeling-tool HTML instances, and per-round docs stay local.
+validation/*
+!validation/make_holdout_sample.py
+!validation/make_labeling_tool.py
+!validation/compute_kappa.py
+
+# Bulletin submission manuscript — local only, never committed (no public preprint)
+bulletin-who/
