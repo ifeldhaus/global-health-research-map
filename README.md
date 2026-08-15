@@ -1,8 +1,8 @@
 # Power and Priority in Global Health Research
 
-**Who leads it, who funds it, and what it studies, across 11 global health journals, 2010–2026.**
+**Who leads it, who funds it, and what it studies, across 16 global health journals, 2010–2026.**
 
-A computational analysis of 33,964 papers (29,448 with classifiable abstracts) published in 11 global health journals from 2010 through July 2026, examining who funds and produces the research, whose leadership it reflects, what it studies relative to disease burden, and which methods it uses.
+A computational analysis of 39,905 works (35,136 with classifiable abstracts; 23,468 research articles) published in 16 dedicated global health journals from 2010 through July 2026, examining who funds and produces the research, whose leadership it reflects, what it studies relative to disease burden, and which methods it uses.
 
 **Isabelle Feldhaus — 2026**
 
@@ -37,7 +37,7 @@ cp .env.example .env
 # Initialize database
 uv run python pipeline/00_setup_db.py
 
-# Run corpus pull (~29,000 works; resumable if interrupted)
+# Run corpus pull (~40,000 works; resumable if interrupted)
 caffeinate -i uv run python pipeline/01_corpus_pull.py
 
 # Classify (each script is resumable; --test for 100 records, --mock for no-API dry runs)
@@ -77,19 +77,32 @@ slim build otherwise. `requirements.txt` pins the runtime dependencies, and
 
 ## Validation
 
-Classification was validated against **345 blind hand-labeled papers** (the model's
+Classification was validated against **404 blind hand-labeled papers** (the model's
 label was never shown to the labeler). Cohen's κ against the shipped labels:
 
 | Axis | Cohen's κ | Landis–Koch |
 |---|---|---|
-| Topic — primary category | 0.66 | substantial |
-| Methods | 0.67 | substantial |
+| Topic — primary category | 0.67 | substantial |
+| Methods | 0.65 | substantial |
 | Study country | 0.93 | almost perfect |
 
-Topic also carries an optional **secondary category** (a co-equal second focus,
-~21% of papers) as a descriptive enrichment layer. Reproduce the numbers with
-`uv run python validation/compute_kappa.py`; full detail in
-[`validation/VALIDATION_REPORT.md`](validation/VALIDATION_REPORT.md).
+Reproduce the numbers with `uv run python validation/compute_kappa.py`.
+
+---
+
+## Reproducing the paper
+
+Every figure and table in the paper is generated from the database by scripts in `analysis/`:
+
+```bash
+uv run python analysis/verify.py             # recompute every headline value, checked against the paper
+uv run python analysis/gen_paper_tables.py   # regenerate all LaTeX tables
+uv run python analysis/make_figures.py       # regenerate the five main figures
+uv run python analysis/make_appendix_figures.py
+uv run python validation/compute_kappa.py    # validation kappas (N = 404)
+```
+
+`analysis/verify.py` re-derives each reported number straight from the raw data using the Methods definitions and prints it beside the manuscript value, so the whole paper can be checked in one command.
 
 ---
 
@@ -97,6 +110,7 @@ Topic also carries an optional **secondary category** (a co-equal second focus,
 
 ```
 pipeline/        # Numbered scripts: corpus pull → classification → enrichment
+analysis/        # Figures, tables, and one-command verification of every paper value
 dashboard/       # Streamlit app (7 pages: overview, four lenses, institutions, data completeness)
 notebooks/       # Analysis notebooks, one per research lens + institutions
 data/
@@ -115,16 +129,21 @@ All papers published in the following journals, 2010 through July 2026 (2026 is 
 | Journal | ISSN | Coverage |
 |---|---|---|
 | Lancet Global Health | 2214-109X | 2013–2026 |
+| PLOS Global Public Health | 2767-3375 | 2021–2026 |
 | BMJ Global Health | 2059-7908 | 2016–2026 |
-| Global Health Science and Practice | 2169-575X | 2013–2026 |
-| Globalization and Health | 1744-8603 | 2010–2026 |
 | Bulletin of the World Health Organization | 0042-9686 | 2010–2026 |
 | Tropical Medicine & International Health | 1360-2276 | 2010–2026 |
-| Health Policy and Planning | 0268-1080 | 2010–2026 |
-| Journal of Global Health | 2047-2978 | 2011–2026 |
-| Global Public Health | 1744-1692 | 2010–2026 |
 | Annals of Global Health | 2214-9996 | 2014–2026 |
-| PLOS Global Public Health | 2767-3375 | 2021–2026 |
+| Journal of Global Health | 2047-2978 | 2011–2026 |
+| Global Health Action | 1654-9880 | 2010–2026 |
+| Health Policy and Planning | 0268-1080 | 2010–2026 |
+| Global Public Health | 1744-1692 | 2010–2026 |
+| International Health | 1876-3405 | 2010–2026 |
+| Globalization and Health | 1744-8603 | 2010–2026 |
+| Global Health Science and Practice | 2169-575X | 2013–2026 |
+| Journal of Epidemiology and Global Health | 2210-6014 | 2012–2026 |
+| Global Health Research and Policy | 2397-0642 | 2016–2026 |
+| Global Health Journal | 2414-6447 | 2017–2026 |
 
 A journal-based corpus was chosen over a topic-based approach for reproducibility and consistency. Inclusion rationale per journal is in [`data/journal_list.csv`](data/journal_list.csv).
 
@@ -142,7 +161,7 @@ Categories: Maternal & Reproductive Health · Child & Adolescent Health · Infec
 
 - **Corpus boundary:** Journal-based approach excludes global health papers in general medical journals (NEJM, Lancet, JAMA). Supplementary topic-based analysis planned for v2.
 - **Gender inference:** Probabilistic, binary, lower accuracy for non-Western names. Reported at population level with confidence thresholds.
-- **LLM classification:** Validated on a 345-paper blind hand-labeled sample (topic κ 0.66, methods κ 0.67, country κ 0.93). See [Validation](#validation).
+- **LLM classification:** Validated on a 404-paper blind hand-labeled sample (topic κ 0.67, methods κ 0.65, country κ 0.93). See [Validation](#validation).
 - **Funder data completeness:** OpenAlex funder data is missing for a significant proportion of papers, particularly pre-2015. Missingness is analyzed as a variable.
 - **Partial final year:** The corpus includes papers through the July 2026 snapshot date. Per-year trend analyses exclude or flag 2026, which is incomplete.
 - **Causal claims:** This is an observational bibliometric study. Associations do not establish causation.
