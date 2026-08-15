@@ -34,7 +34,7 @@ COMM = "classified_method AND method_type = 'M15'"   # commentary/editorial/pers
 c = duckdb.connect(DB, read_only=True)
 RA = c.execute(f'SELECT COUNT(*) FROM works w WHERE {SUB}').fetchone()[0]
 COMM_N = c.execute(f'SELECT COUNT(*) FROM works w WHERE {COMM}').fetchone()[0]
-# FUNDED = research articles with >=1 grant record (matches "65.2% acknowledged a funder")
+# FUNDED = research articles with >=1 grant record (63.9% of research articles acknowledged a funder)
 FUNDED = c.execute(
     f'SELECT COUNT(DISTINCT w.openalex_id) FROM works w JOIN grants g '
     f'ON w.openalex_id=g.openalex_id WHERE {SUB}').fetchone()[0]

@@ -142,8 +142,8 @@ def fig2_top_funders():
 def fig3_externally_led():
     # Self-contained, matching the Results definition: externally-led = no author
     # (any position) affiliated with the study country, single-country research
-    # articles only. Overall is the weighted average of the regions (plus the few
-    # study countries outside the WHO-region map).
+    # articles only. The overall (black) line is computed across all single-country
+    # articles; the regional lines break the same set down by WHO region.
     rows = con.execute(f"""
         WITH sc AS (
           SELECT w.openalex_id id, w.study_country sctry, w.publication_year yr
@@ -186,39 +186,41 @@ def fig3_externally_led():
 
 # ---------------------------------------------------------------- Figure 4
 def fig4_topic_share():
-    # highlight the key movers; gray the rest
-    # Six highest-movement topics by |late - early| share change (2010--2012 vs
-    # 2023--2025), matching the Results text: NCD, HIV, Health Systems, Child,
-    # Infectious (other), Neglected Tropical.
-    movers = {
-        'Non-Communicable': OKABE[3],
-        'HIV': OKABE[0],
-        'Health Systems': OKABE[2],
-        'Child': OKABE[1],
-        'Infectious Disease (non': OKABE[4],
-        'Neglected Tropical': OKABE[5],
-    }
+    # highlight the key movers; gray the rest. Six highest-movement topics keyed by
+    # taxonomy letter (F=NCD, D=HIV/TB/Malaria, I=Health Systems, B=Child,
+    # C=Infectious other, E=NTD) to avoid name-substring collisions, e.g. 'HIV' also
+    # occurring inside 'non-HIV/TB/Malaria'.
+    movers = {'F': OKABE[3], 'D': OKABE[0], 'I': OKABE[2],
+              'B': OKABE[1], 'C': OKABE[4], 'E': OKABE[5]}
+    # Per-year topic share computed directly from the research-article subset, so the
+    # denominator is that year's research articles (matching the Results text and
+    # tab:topic-dist), not the broader precomputed total_papers.
+    import csv
+    tcat = {r['category_letter']: r['category_name']
+            for r in csv.DictReader(open(REPO / 'data/taxonomy/topic_taxonomy.csv'))}
     rows = con.execute(
-        "SELECT topic_name, publication_year, pub_share FROM topic_year_counts "
-        "WHERE publication_year BETWEEN ? AND ? ORDER BY 1,2", [Y0, Y1]).fetchall()
+        f"""WITH yt AS (SELECT publication_year yr, COUNT(*) tot FROM works w WHERE {SUB}
+                        AND publication_year BETWEEN {Y0} AND {Y1} GROUP BY 1)
+            SELECT w.topic_category, w.publication_year,
+                   100.0 * COUNT(*) / ANY_VALUE(yt.tot)
+            FROM works w JOIN yt ON w.publication_year = yt.yr
+            WHERE {SUB} AND w.publication_year BETWEEN {Y0} AND {Y1}
+            GROUP BY w.topic_category, w.publication_year ORDER BY 1, 2""").fetchall()
     series = {}
-    for name, yr, share in rows:
-        if not name:
-            continue
-        series.setdefault(name, []).append((yr, share * 100 if share <= 1 else share))
+    for cat, yr, share in rows:
+        series.setdefault(cat, []).append((yr, share))
     fig, ax = plt.subplots(figsize=(7.6, 4.6))
-    # gray background series
-    for name, pts in series.items():
-        if not any(k in name for k in movers):
+    # gray background: non-mover categories
+    for cat, pts in series.items():
+        if cat not in movers:
             ax.plot([p[0] for p in pts], [p[1] for p in pts],
                     color='#CCCCCC', lw=1, alpha=0.6, zorder=1)
     # highlighted movers
-    for key, color in movers.items():
-        match = next((n for n in series if key in n), None)
-        if match:
-            pts = series[match]
+    for cat, color in movers.items():
+        if cat in series:
+            pts = series[cat]
             ax.plot([p[0] for p in pts], [p[1] for p in pts], color=color, lw=2.4,
-                    marker='.', ms=5, label=match, zorder=3)
+                    marker='.', ms=5, label=tcat.get(cat, cat), zorder=3)
     ax.set_xlabel('Year'); ax.set_ylabel('Share of research articles (%)')
     ax.set_ylim(bottom=0)
     ax.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), fontsize=8.5,
@@ -229,8 +231,8 @@ def fig4_topic_share():
 # ---------------------------------------------------------------- Figure 5
 def fig5_north_south_leadership():
     hi = tuple(HIGH_INCOME_ISO2)
-    # Research-article subset (n = 19,035), consistent with the rest of the
-    # Producing Institutions section (institution counts, concentration, etc.).
+    # Research-article subset, consistent with the rest of the Producing Institutions
+    # section (institution counts, concentration, etc.).
     q = f"""WITH pc AS (
         SELECT DISTINCT a.openalex_id wid, w.publication_year yr, a.institution_country cc
         FROM authorships a JOIN works w ON a.openalex_id = w.openalex_id
