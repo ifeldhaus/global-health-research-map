@@ -50,6 +50,7 @@ batches/
 
 # Paper writing archive — local only, never committed
 paper/
+docs/paper-outline.md
 
 # Validation: keep only the reproducible scripts in git; hand-labeled data,
 # labeling-tool HTML instances, and per-round docs stay local.
