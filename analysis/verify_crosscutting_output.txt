@@ -1,0 +1,55 @@
+ANCHORS (must match verify.py-certified figures)
+  [PASS] research articles (SUB)                              got=23468  exp=23468
+  [PASS] single-country resolvable (n)                        got=15826  exp=15826
+  [PASS] externally-led baseline %                            got=17.2  exp=17.2
+
+A1 DESCRIPTIVES: externally-led % by funder (+ Wilson 95% CI)
+  [PASS] National Institutes of Hea n                         got=1005  exp=1005
+  [PASS] National Institutes of Hea ext%                      got=11.1  exp=11.1
+  [PASS] National Institutes of Hea CI                        got=(9.3, 13.2)  exp=(9.3, 13.2)
+  [PASS] Wellcome Trust n                                     got=928  exp=928
+  [PASS] Wellcome Trust ext%                                  got=10.3  exp=10.3
+  [PASS] Wellcome Trust CI                                    got=(8.5, 12.5)  exp=(8.5, 12.5)
+  [PASS] MRC UK n                                             got=897  exp=897
+  [PASS] MRC UK ext%                                          got=11.7  exp=11.7
+  [PASS] MRC UK CI                                            got=(9.8, 14.0)  exp=(9.8, 14.0)
+  [PASS] Fogarty International Cent n                         got=564  exp=564
+  [PASS] Fogarty International Cent ext%                      got=9.4  exp=9.4
+  [PASS] Fogarty International Cent CI                        got=(7.3, 12.1)  exp=(7.3, 12.1)
+  [PASS] USAID n                                              got=635  exp=635
+  [PASS] USAID ext%                                           got=24.9  exp=24.9
+  [PASS] USAID CI                                             got=(21.7, 28.4)  exp=(21.7, 28.4)
+  [PASS] Bill & Melinda Gates Found n                         got=1137  exp=1137
+  [PASS] Bill & Melinda Gates Found ext%                      got=17.1  exp=17.1
+  [PASS] Bill & Melinda Gates Found CI                        got=(15.0, 19.4)  exp=(15.0, 19.4)
+
+A1 ROBUSTNESS (supplement): topic-adjusted OR = logistic OR (two methods agree)
+  [PASS] National Institutes of CMH adjOR                     got=0.67  exp=0.67
+  [PASS] National Institutes of CMH vs logit agree            got=0.0  exp=0.0
+  [PASS] USAID CMH adjOR                                      got=1.54  exp=1.54
+  [PASS] USAID CMH vs logit agree                             got=0.0  exp=0.0
+  [PASS] Bill & Melinda Gates F CMH adjOR                     got=0.95  exp=0.95
+  [PASS] Bill & Melinda Gates F CMH vs logit agree            got=0.0  exp=0.0
+
+CONFOUNDING CRITERIA
+  [PASS] topic<->external chi2                                got=351  exp=351
+  [PASS] topic<->external CramerV                             got=0.149  exp=0.149
+  [PASS] external range low %                                 got=9.4  exp=9.4
+  [PASS] external range high %                                got=35.4  exp=35.4
+
+A2: funder-type shares + residuals at the burden gaps
+  [PASS] HIV/TB/mal gov %                                     got=79.1  exp=79.1
+  [PASS] NCD multi %                                          got=18.3  exp=18.3
+  [PASS] Mental multi %                                       got=11.5  exp=11.5
+  [PASS] Mental multi residual                                got=-5.3  exp=-5.3
+  [PASS] NCD multi residual                                   got=-4.8  exp=-4.8
+
+SMALL COMMUNITY (institution concentration, two methods)
+  [PASS] distinct lead institutions                           got=5219  exp=5219
+  [PASS] institutions for 25% (pandas)                        got=34  exp=34
+  [PASS] institutions for 50% (pandas)                        got=186  exp=186
+  [PASS] institutions for 50% (SQL window)                    got=186  exp=186
+  [PASS] distinct last authors                                got=14278  exp=14278
+  [PASS] last-authors for 50% (~3200)                         got=3174  exp=3174
+
+ALL PASS
