@@ -1,0 +1,71 @@
+
+==========================================================================
+STEP 0  Base frame: single-country RA with resolvable affiliation
+==========================================================================
+N = 15,826  (validated target 15,826: MATCH)
+  collab    6,612  41.8% [41.0-42.5]
+  local     6,485  41.0% [40.2-41.7]
+  external  2,729  17.2% [16.7-17.8]
+  validated targets: local 41.0%, collab 41.8%, external 17.2%
+
+==========================================================================
+STEP 1 (A1a)  Funded rate by leadership  [Wilson 95% CI; chi-square]
+==========================================================================
+  local     funded 41.1% [39.9-42.3]  (n=6,485)
+  collab    funded 57.8% [56.6-59.0]  (n=6,612)
+  external  funded 45.5% [43.7-47.4]  (n=2,729)
+  chi-square = 379.6, dof = 2, p = 3.69e-83, Cramer's V = 0.155 (small)
+  NOTE: collaborative papers have more authors/institutions -> more grant records;
+        funded-rate-by-leadership is confounded by team size. Reported, not emphasized.
+
+==========================================================================
+STEP 2 (A1b)  Funder -> externally-led: crude vs TOPIC-ADJUSTED (CMH)
+==========================================================================
+  exposure = paper acknowledges funder X; outcome = externally-led; strata = 15 topics
+  OR<1 => funder's papers LESS externally-led (more locally led) than the rest
+
+  baseline externally-led (whole set): 17.2% [16.7-17.8]
+
+  funder                               n        ext% [95CI]        crudeOR[95CI]     adjOR(topic)[95CI]  CMHp_holm     BDp
+  National Institutes of Health    1,005   11.1% [9.3-13.2]  0.58[0.48-0.72]     0.67[0.55-0.82]      0.000208    0.94
+  Wellcome Trust                     928   10.3% [8.5-12.5]  0.54[0.43-0.67]     0.57[0.46-0.71]      1.74e-06    0.55
+  MRC UK                             897   11.7% [9.8-14.0]  0.62[0.51-0.77]     0.64[0.52-0.79]      7.83e-05   0.032
+  Fogarty International Center       564    9.4% [7.3-12.1]  0.49[0.37-0.65]     0.55[0.41-0.74]      0.000115    0.22
+  USAID                              635  24.9% [21.7-28.4]  1.63[1.35-1.96]     1.54[1.27-1.86]       3.1e-05    0.98
+  Bill & Melinda Gates Foundation  1,137  17.1% [15.0-19.4]  0.99[0.84-1.16]     0.95[0.80-1.11]         0.497  0.0043
+  (adjOR from Cochran-Mantel-Haenszel across topic strata; BDp=Breslow-Day/Tarone homogeneity;
+   CMHp_holm = Holm-adjusted CMH p across the 6 funders)
+
+==========================================================================
+STEP 2b  Logistic cross-check: external ~ funder + C(topic)  (adjusted OR)
+==========================================================================
+  National Institutes of Health      adjOR = 0.67 [0.55-0.82], p = 0.000114
+  USAID                              adjOR = 1.54 [1.28-1.86], p = 7.05e-06
+  Bill & Melinda Gates Foundation    adjOR = 0.94 [0.80-1.11], p = 0.497
+
+==========================================================================
+STEP 3 (A2)  Topic x funder-category association  [chi-square, Cramer's V, residuals]
+==========================================================================
+  funded single+multi RA analyzed: 11,859
+
+  GOV   names-gov: chi2=326.3 dof=14 p=3.83e-61 V=0.166
+        most UNDER (resid): HealthSys-4.8, Child-3.3, HealthEcon-2.6
+        most OVER  (resid): HIV/TB/mal+6.3, Mental+3.5, Conflict+2.0
+  PHIL  names-phil: chi2=203.1 dof=14 p=1.29e-35 V=0.131
+        most UNDER (resid): Conflict-4.3, HIV/TB/mal-3.3, Mental-3.1
+        most OVER  (resid): Epidemiology+5.7, Child+4.7, HealthEcon+3.4
+  MULTI names-multi: chi2=156.6 dof=14 p=3.35e-26 V=0.115
+        most UNDER (resid): Mental-5.3, NCD-4.8, Climate-2.2
+        most OVER  (resid): HealthSys+5.5, Child+4.2, OtherInfect+1.6
+  Holm-adjusted p across the 3 categories: ['1.15e-60', '2.58e-35', '3.35e-26']
+
+  Key proportions (Wilson 95% CI), share of a topic's funded RA naming category:
+    NCD            gov   71.6% [69.0-74.0]  (n=1,247)
+    NCD            multi 18.3% [16.2-20.5]  (n=1,247)
+    NCD            phil  32.1% [29.5-34.7]  (n=1,247)
+    Mental health  gov   81.9% [77.8-85.5]  (n=382)
+    Mental health  multi 11.5% [8.7-15.1]  (n=382)
+    Mental health  phil  26.4% [22.3-31.1]  (n=382)
+    HIV/TB/malaria gov   79.1% [77.2-80.9]  (n=1,904)
+    HIV/TB/malaria multi 23.4% [21.5-25.3]  (n=1,904)
+    HIV/TB/malaria phil  31.6% [29.5-33.7]  (n=1,904)

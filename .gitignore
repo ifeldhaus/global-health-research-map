@@ -61,3 +61,6 @@ validation/*
 
 # Bulletin submission manuscript — local only, never committed (no public preprint)
 bulletin-who/
+
+# PLOS Global Public Health submission — local only, never committed (no public preprint)
+plos-gph/
