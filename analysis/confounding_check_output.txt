@@ -1,0 +1,9 @@
+CRITERION 1  Topic <-> OUTCOME (externally-led)
+  chi2=351.1 dof=14 p=2.40e-66 CramerV=0.149
+  externally-led ranges 9.4% (OtherInf) to 35.4% (Conflict)
+
+CRITERION 2  Topic <-> EXPOSURE (funder), for the key funders
+  National Institutes of Health  chi2= 348.5 p=8.6e-66 V=0.148 | top topic HIV/TB/mal 35% of its papers vs 16% field
+  USAID                          chi2= 257.0 p=1.0e-46 V=0.127 | top topic HIV/TB/mal 26% of its papers vs 16% field
+  Wellcome Trust                 chi2=  85.1 p=3.2e-12 V=0.073 | top topic HIV/TB/mal 19% of its papers vs 16% field
+  Bill & Melinda Gates Foundatio chi2= 307.5 p=3.2e-57 V=0.139 | top topic HIV/TB/mal 18% of its papers vs 16% field
