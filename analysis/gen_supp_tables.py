@@ -1,5 +1,7 @@
-"""Emit the two PLOS supplement tables (funder x leadership ORs; funder-type x topic
-residuals) as LaTeX into plos-gph/tables/. Values are certified by verify_crosscutting.py."""
+"""Emit the two PLOS supplement tables into plos-gph/tables/. S11 = funder x leadership
+(odds ratios). S12 = share of each topic's funded articles naming each funder type, with
+an all-topics reference row and cells that depart significantly (|Pearson residual|>2)
+shown in bold. Values certified by verify_crosscutting.py."""
 import duckdb, numpy as np, pandas as pd
 from pathlib import Path
 from scipy.stats import chi2_contingency
@@ -11,6 +13,7 @@ SUB=("classified_topic AND topic_category NOT IN ('Z') AND classified_method AND
 FJ="REPLACE(g.funder_id,'https://openalex.org/','') = fu.openalex_id"
 def wci(k,n): lo,hi=proportion_confint(k,n,method='wilson'); return f"{100*k/n:.1f} ({100*lo:.1f}--{100*hi:.1f})"
 
+# ===== S11: funder x leadership =====
 base=con.execute(f"""
   WITH sc AS (SELECT w.openalex_id id, w.study_country sctry, w.topic_category tc FROM works w
       WHERE {SUB} AND study_country IS NOT NULL AND study_country NOT IN ('GLOBAL','UNKNOWN') AND study_country NOT LIKE '%|%'),
@@ -18,8 +21,6 @@ base=con.execute(f"""
       FROM sc JOIN authorships a ON sc.id=a.openalex_id WHERE a.institution_country IS NOT NULL AND a.institution_country<>'' GROUP BY sc.id, sc.tc)
   SELECT id, tc, CASE WHEN any_local=0 THEN 1 ELSE 0 END ext FROM lab""").df()
 fund=con.execute(f"SELECT DISTINCT g.openalex_id id, fu.canonical_name f FROM grants g JOIN funders fu ON {FJ}").df()
-
-# ---- S: funder x leadership ----
 disp=[('National Institutes of Health','National Institutes of Health (Gov)'),
       ('Wellcome Trust','Wellcome Trust (Phil)'),('MRC UK','Medical Research Council (Gov)'),
       ('Fogarty International Center','Fogarty International Center (Gov)'),
@@ -30,7 +31,7 @@ for canon,label in disp:
     ids=set(fund[fund.f==canon].id); base['exp']=base.id.isin(ids).astype(int)
     a=int(((base.exp==1)&(base.ext==1)).sum()); b=int(((base.exp==1)&(base.ext==0)).sum())
     c=int(((base.exp==0)&(base.ext==1)).sum()); d=int(((base.exp==0)&(base.ext==0)).sum())
-    t=Table2x2(np.array([[a,b],[c,d]])); cor=t.oddsratio
+    cor=Table2x2(np.array([[a,b],[c,d]])).oddsratio
     strata=[]
     for tc,grp in base.groupby('tc'):
         aa=int(((grp.exp==1)&(grp.ext==1)).sum()); bb=int(((grp.exp==1)&(grp.ext==0)).sum())
@@ -39,24 +40,22 @@ for canon,label in disp:
     st=StratifiedTable(np.array(strata).transpose(1,2,0).astype(float))
     lo,hi=st.oddsratio_pooled_confint(); bd=st.test_equal_odds().pvalue
     rows.append(f"{label} & {a+b:,} & {wci(a,a+b)} & {cor:.2f} & {st.oddsratio_pooled:.2f} ({lo:.2f}--{hi:.2f}) & {bd:.2g} \\\\")
-tex=(r"\begin{table}[H]\centering\footnotesize"
- r"\caption{Funding source and geographic leadership among single-country research articles "
- r"($n=15{,}826$; field-wide externally-led share 17.2\%). Externally led $=$ no author affiliated "
- r"with the study country. Odds ratios compare articles acknowledging each funder with all others. "
- r"The topic-adjusted odds ratio is the Cochran--Mantel--Haenszel estimate across the 15 topic strata; "
- r"it agreed with a topic-fixed-effects logistic regression (e.g., NIH 0.67, USAID 1.54, Gates 0.94). "
- r"Topic meets both confounding criteria: externally-led research varies by topic ($\chi^2_{14}=351$, "
- r"$V=0.15$) and funders concentrate by topic. This is a robustness check on the descriptive shares and "
- r"is not interpreted causally. $P$-values Holm-adjusted across the six funders. Breslow--Day tests "
- r"homogeneity of the stratum-specific odds ratios.}"
- r"\label{tab:funder-leadership}"
+s11=(r"\begin{table}[H]\centering\footnotesize"
+ r"\caption{\textbf{How often each major funder's single-country studies were led from outside the study "
+ r"country, versus the field's 17.2\%; the topic-adjusted odds ratio confirms the difference is not "
+ r"explained by what each funder studies --- a descriptive association, not a causal effect.} "
+ r"Single-country research articles with a resolvable affiliation ($n=15{,}826$). Externally led $=$ no "
+ r"author affiliated with the study country. Odds ratios compare articles acknowledging each funder with "
+ r"all others; the topic-adjusted odds ratio is the Cochran--Mantel--Haenszel estimate across the 15 topic "
+ r"strata and agreed with a topic-fixed-effects logistic regression (NIH 0.67, USAID 1.54, Gates 0.94). "
+ r"$P$-values Holm-adjusted across the six funders; Breslow--Day tests homogeneity of the stratum-specific "
+ r"odds ratios.}\label{tab:funder-leadership}"
  r"\begin{tabular}{@{}lrrrrr@{}}\toprule"
  r"Funder & $n$ & Ext.-led \% (95\% CI) & Crude OR & Topic-adj.\ OR (95\% CI) & Breslow--Day $p$ \\\midrule "
- + " ".join(rows) +
- r"\bottomrule\end{tabular}\end{table}"+"\n")
-(OUT/"supp_funder_leadership.tex").write_text(tex); print("wrote supp_funder_leadership.tex")
+ + " ".join(rows) + r"\bottomrule\end{tabular}\end{table}"+"\n")
+(OUT/"supp_funder_leadership.tex").write_text(s11); print("wrote supp_funder_leadership.tex")
 
-# ---- S: funder-type x topic residuals ----
+# ===== S12: topic x funder-type SHARES with reference row + significance bold =====
 raf=con.execute(f"""
   WITH ra AS (SELECT openalex_id id, topic_category tc FROM works w WHERE {SUB}),
     fc AS (SELECT DISTINCT ra.id, ra.tc,
@@ -69,25 +68,35 @@ TAX={'A':'Maternal \\& reproductive','B':'Child health','C':'Other infectious','
  'E':'Neglected tropical','F':'Noncommunicable','G':'Mental health','H':'Nutrition','I':'Health systems',
  'J':'Health economics','K':'Climate','L':'Conflict \\& humanitarian','M':'Surgical \\& emergency',
  'N':'Epidemiology','O':'Research methods'}
-resid={}; Vs={}
+resid={}; overall={}
 for cat in ['gov','phil','multi']:
     ct=pd.crosstab(raf.tc, raf[cat]); chi2,p,dof,exp=chi2_contingency(ct.values)
-    Vs[cat]=np.sqrt(chi2/(len(raf)*(min(ct.shape)-1)))
     col1=list(ct.columns).index(1); r=(ct.values-exp)/np.sqrt(exp)
     resid[cat]={tc:r[i,col1] for i,tc in enumerate(ct.index)}
-def cell(x): return (f"\\textbf{{{x:+.1f}}}" if abs(x)>2 else f"{x:+.1f}")
-order=raf.tc.value_counts().index  # by frequency
-rows=[f"{TAX.get(tc,tc)} & {cell(resid['gov'][tc])} & {cell(resid['phil'][tc])} & {cell(resid['multi'][tc])} \\\\"
-      for tc in order if tc in TAX]
-tex=(r"\begin{table}[H]\centering\footnotesize"
- r"\caption{Standardized (Pearson) residuals for topic $\times$ funder type among funded research "
- r"articles ($n=11{,}859$). Positive $=$ the topic names that funder type more than expected under "
- r"independence, negative $=$ less. Each column was tested by a chi-squared test (Government $V=0.17$, "
- r"Philanthropic $V=0.13$, Multilateral $V=0.12$; all Holm-adjusted $p<0.001$). Cells with "
- r"$|\text{residual}|>2$ (bold) approximate $p<0.05$.}"
- r"\label{tab:funder-topic}"
+    overall[cat]=100*raf[cat].mean()
+def cell(tc,cat):
+    sub=raf[raf.tc==tc]; pct=100*sub[cat].mean()
+    return f"\\textbf{{{pct:.1f}}}" if abs(resid[cat][tc])>2 else f"{pct:.1f}"
+order=raf.tc.value_counts().index
+ref=f"\\emph{{All topics (reference)}} & \\emph{{{overall['gov']:.1f}}} & \\emph{{{overall['phil']:.1f}}} & \\emph{{{overall['multi']:.1f}}} \\\\\\midrule "
+body=" ".join(f"{TAX[tc]} & {cell(tc,'gov')} & {cell(tc,'phil')} & {cell(tc,'multi')} \\\\" for tc in order if tc in TAX)
+s12=(r"\begin{table}[H]\centering\footnotesize"
+ r"\caption{\textbf{Where each funder type is over- or under-represented by topic: the share of a topic's "
+ r"funded articles naming a government, philanthropic, or multilateral funder, against the all-topics rate; "
+ r"the low bold values show multilateral and philanthropic funding is scarcest at the biggest burden gaps, "
+ r"noncommunicable disease and mental health.} Funded research articles ($n=11{,}859$). Articles may name "
+ r"more than one funder, so rows need not sum to 100\%. \textbf{Bold} $=$ significantly above or below the "
+ r"all-topics rate (standardized residual $|{>}2|$; chi-squared $p<0.001$ for each funder type, "
+ r"Cram\'er's $V$ 0.12--0.17). Compare each cell with the reference row.}\label{tab:funder-topic}"
  r"\begin{tabular}{@{}lrrr@{}}\toprule"
- r"Topic & Government & Philanthropic & Multilateral \\\midrule "
- + " ".join(rows) +
- r"\bottomrule\end{tabular}\end{table}"+"\n")
-(OUT/"supp_funder_topic.tex").write_text(tex); print("wrote supp_funder_topic.tex")
+ r"Topic & Government \% & Philanthropic \% & Multilateral \% \\\midrule "
+ + ref + body + r"\bottomrule\end{tabular}\end{table}"+"\n")
+(OUT/"supp_funder_topic.tex").write_text(s12); print("wrote supp_funder_topic.tex")
+# echo the S12 values for verification
+print("\nOverall: gov %.1f  phil %.1f  multi %.1f" % (overall['gov'],overall['phil'],overall['multi']))
+for tc in order:
+    if tc in TAX:
+        sub=raf[raf.tc==tc]
+        print(f"  {TAX[tc][:24]:24} gov {100*sub['gov'].mean():4.1f}{'*' if abs(resid['gov'][tc])>2 else ' '}  "
+              f"phil {100*sub['phil'].mean():4.1f}{'*' if abs(resid['phil'][tc])>2 else ' '}  "
+              f"multi {100*sub['multi'].mean():4.1f}{'*' if abs(resid['multi'][tc])>2 else ' '}")
