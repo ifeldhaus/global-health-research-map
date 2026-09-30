@@ -40,7 +40,7 @@ for canon,label in disp:
     st=StratifiedTable(np.array(strata).transpose(1,2,0).astype(float))
     lo,hi=st.oddsratio_pooled_confint(); bd=st.test_equal_odds().pvalue
     rows.append(f"{label} & {a+b:,} & {wci(a,a+b)} & {cor:.2f} & {st.oddsratio_pooled:.2f} ({lo:.2f}--{hi:.2f}) & {bd:.2g} \\\\")
-s11=(r"\begin{table}[H]\centering\footnotesize"
+s11=(r"\begin{table}[htbp]\centering\footnotesize"
  r"\caption{\textbf{How often each major funder's single-country studies were led from outside the study "
  r"country, versus the field's 17.2\%; the topic-adjusted odds ratio confirms the difference is not "
  r"explained by what each funder studies --- a descriptive association, not a causal effect.} "
@@ -80,7 +80,7 @@ def cell(tc,cat):
 order=raf.tc.value_counts().index
 ref=f"\\emph{{All topics (reference)}} & \\emph{{{overall['gov']:.1f}}} & \\emph{{{overall['phil']:.1f}}} & \\emph{{{overall['multi']:.1f}}} \\\\\\midrule "
 body=" ".join(f"{TAX[tc]} & {cell(tc,'gov')} & {cell(tc,'phil')} & {cell(tc,'multi')} \\\\" for tc in order if tc in TAX)
-s12=(r"\begin{table}[H]\centering\footnotesize"
+s12=(r"\begin{table}[htbp]\centering\footnotesize"
  r"\caption{\textbf{Where each funder type is over- or under-represented by topic: the share of a topic's "
  r"funded articles naming a government, philanthropic, or multilateral funder, against the all-topics rate; "
  r"the low bold values show multilateral and philanthropic funding is scarcest at the biggest burden gaps, "
