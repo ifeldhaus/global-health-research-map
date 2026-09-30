@@ -88,7 +88,7 @@ s12=(r"\begin{table}[htbp]\centering\footnotesize"
  r"more than one funder, so rows need not sum to 100\%. \textbf{Bold} $=$ significantly above or below the "
  r"all-topics rate (standardized residual $|{>}2|$; chi-squared $p<0.001$ for each funder type, "
  r"Cram\'er's $V$ 0.12--0.17). Compare each cell with the reference row.}\label{tab:funder-topic}"
- r"\begin{tabular}{@{}lrrr@{}}\toprule"
+ r"\begin{tabular}{@{}lccc@{}}\toprule"
  r"Topic & Government \% & Philanthropic \% & Multilateral \% \\\midrule "
  + ref + body + r"\bottomrule\end{tabular}\end{table}"+"\n")
 (OUT/"supp_funder_topic.tex").write_text(s12); print("wrote supp_funder_topic.tex")
